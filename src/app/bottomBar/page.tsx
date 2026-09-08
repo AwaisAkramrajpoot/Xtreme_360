@@ -1,5 +1,5 @@
-﻿import { PageScreen } from "@/components/layout/PageScreen";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <PageScreen route="/bottomBar" />;
+  redirect("/dashboard");
 }

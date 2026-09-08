@@ -42,10 +42,9 @@ export function AuthSplitLayout({
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Branding panel */}
+    <div className="h-dvh flex overflow-hidden">
       <div
-        className="hidden lg:flex lg:w-1/2 xl:w-[45%] flex-col justify-between p-12 relative overflow-hidden"
+        className="hidden lg:flex lg:w-1/2 xl:w-[45%] h-full flex-col justify-between p-12 relative overflow-hidden"
         style={{ backgroundColor: AppColors.primary }}
       >
         <div className="relative z-10">
@@ -56,8 +55,11 @@ export function AuthSplitLayout({
           >
             Xtreme-360
           </h1>
-          <p className="text-lg text-white/80 max-w-md leading-relaxed" style={{ fontFamily: "var(--font-poppins)" }}>
-            All-in-one business management — inventory, sales, HR, and production in one powerful platform.
+          <p
+            className="text-lg text-white/80 max-w-md leading-relaxed"
+            style={{ fontFamily: "var(--font-poppins)" }}
+          >
+            All-in-one business management - inventory, sales, HR, and production in one powerful platform.
           </p>
         </div>
         <div className="relative z-10 flex justify-center">
@@ -81,10 +83,12 @@ export function AuthSplitLayout({
         />
       </div>
 
-      {/* Form panel */}
-      <div className="flex-1 flex flex-col min-h-screen bg-[#F5F6FA]">
+      <div className="flex-1 flex flex-col min-h-0 h-full bg-[#F5F6FA] overflow-hidden">
         {showBack && (
-          <header className="h-16 flex items-center px-8 bg-white border-b shrink-0" style={{ borderColor: AppColors.lightGrey }}>
+          <header
+            className="h-16 flex items-center px-8 bg-white border-b shrink-0"
+            style={{ borderColor: AppColors.lightGrey }}
+          >
             <button
               type="button"
               onClick={() => router.back()}
@@ -96,36 +100,33 @@ export function AuthSplitLayout({
             </button>
           </header>
         )}
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div
-            className="w-full max-w-[440px] bg-white rounded-2xl p-8 xl:p-10"
-            style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}
-          >
-            <h2
-              className="text-2xl xl:text-3xl font-bold text-black mb-2"
-              style={{ fontFamily: "var(--font-poppins)" }}
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-8 py-8">
+          <div className="w-full min-h-full flex items-start justify-center">
+            <div
+              className="w-full max-w-[440px] bg-white rounded-2xl p-8 xl:p-10"
+              style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}
             >
-              {title}
-            </h2>
-            {subtitle && (
-              <p className="text-sm mb-8" style={{ color: AppColors.grey, fontFamily: "var(--font-poppins)" }}>
-                {subtitle}
-              </p>
-            )}
-            {!subtitle && <div className="mb-8" />}
-            {children}
+              <h2
+                className="text-2xl xl:text-3xl font-bold text-black mb-2"
+                style={{ fontFamily: "var(--font-poppins)" }}
+              >
+                {title}
+              </h2>
+              {subtitle && (
+                <p className="text-sm mb-8" style={{ color: AppColors.grey, fontFamily: "var(--font-poppins)" }}>
+                  {subtitle}
+                </p>
+              )}
+              {!subtitle && <div className="mb-8" />}
+              {children}
+            </div>
+          </div>
+
+          <div className="py-8 flex justify-center">
+            {footer ?? <PoweredBy />}
           </div>
         </div>
-        {footer && (
-          <div className="pb-8 flex justify-center">
-            {footer}
-          </div>
-        )}
-        {!footer && (
-          <div className="pb-8 flex justify-center">
-            <PoweredBy />
-          </div>
-        )}
       </div>
     </div>
   );

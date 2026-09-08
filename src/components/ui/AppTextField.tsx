@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import clsx from "clsx";
 import { AppColors } from "@/constants/colors";
 import { AppAsset } from "./AppAsset";
 import { AppImages } from "@/constants/images";
-import { formatDate } from "@/utils/helpers";
+import { DatePickerPopover } from "./DatePickerPopover";
 
 interface AppTextFieldProps {
   title?: string;
@@ -54,29 +54,22 @@ export function AppTextField({
 }: AppTextFieldProps) {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
+  const [dateOpen, setDateOpen] = useState(false);
+  const fieldId = useId();
+  const anchorRef = useRef<HTMLDivElement>(null);
 
   const currentValue = value ?? internalValue;
+  const canPickDate = Boolean(isDateField) && !readOnly;
 
   const handleChange = (val: string) => {
     setInternalValue(val);
     onChange?.(val);
   };
 
-  const handleDateClick = async () => {
-    if (onClick) onClick();
-    if (isDateField) {
-      const input = document.createElement("input");
-      input.type = "date";
-      input.onchange = () => {
-        if (input.value) {
-          const date = new Date(input.value);
-          const formatted = formatDate(date, "dd/MM/yyyy");
-          handleChange(formatted);
-          onDateChange?.(date);
-        }
-      };
-      input.click();
-    }
+  const openDatePicker = () => {
+    onClick?.();
+    if (!canPickDate) return;
+    setDateOpen(true);
   };
 
   const InputTag = maxLines && maxLines > 1 ? "textarea" : "input";
@@ -84,27 +77,30 @@ export function AppTextField({
   return (
     <div className="w-full">
       {title && (
-        <>
-          <label
-            className="block text-sm font-semibold text-black"
-            style={{ fontFamily: "var(--font-poppins)" }}
-          >
-            {title}
-          </label>
-          <div className="h-[5px]" />
-        </>
+        <label
+          htmlFor={fieldId}
+          className="mb-[5px] block text-sm font-semibold text-black"
+          style={{ fontFamily: "var(--font-poppins)" }}
+        >
+          {title}
+        </label>
       )}
-      <div className="relative">
+
+      <div className="relative" ref={anchorRef}>
         {prefix && (
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10">{prefix}</div>
+          <div className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2">
+            {prefix}
+          </div>
         )}
+
         <InputTag
+          id={fieldId}
           name={name}
           value={currentValue}
           readOnly={readOnly || isDateField}
-          onClick={isDateField ? handleDateClick : onClick}
+          onClick={canPickDate ? openDatePicker : onClick}
           onChange={(e) => handleChange(e.target.value)}
-          placeholder={hintText}
+          placeholder={hintText ?? (isDateField ? "dd/mm/yyyy" : undefined)}
           maxLength={maxLength}
           type={
             isPasswordField
@@ -116,44 +112,83 @@ export function AppTextField({
           rows={maxLines}
           className={clsx(
             "w-full text-sm text-black outline-none",
-            prefix ? "pl-12" : "px-4",
+            prefix ? "pl-12" : "pl-4",
             isPasswordField || isDateField || suffix ? "pr-12" : "pr-4",
-            maxLines && maxLines > 1 ? "py-2" : "h-12 flex items-center"
+            maxLines && maxLines > 1 ? "py-2.5" : "h-12",
+            canPickDate ? "cursor-pointer" : ""
           )}
           style={{
             backgroundColor: fillColor,
             borderRadius,
-            border: error ? "1px solid red" : "1px solid transparent",
+            border: error
+              ? "1px solid red"
+              : dateOpen
+                ? `1px solid ${AppColors.primary}`
+                : "1px solid transparent",
             fontFamily: "var(--font-poppins)",
           }}
           onFocus={(e) => {
             if (!error) e.currentTarget.style.border = `1px solid ${AppColors.primary}`;
           }}
           onBlur={(e) => {
-            if (!error) e.currentTarget.style.border = "1px solid transparent";
+            if (!error && !dateOpen) e.currentTarget.style.border = "1px solid transparent";
           }}
         />
+
         {isDateField && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+          <button
+            type="button"
+            tabIndex={canPickDate ? 0 : -1}
+            disabled={!canPickDate}
+            aria-label="Open date picker"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openDatePicker();
+            }}
+            className={clsx(
+              "absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md",
+              canPickDate ? "cursor-pointer hover:bg-black/5" : "cursor-default opacity-60"
+            )}
+          >
             <AppAsset src={AppImages.date} width={20} height={20} />
-          </div>
+          </button>
         )}
+
         {isPasswordField && !suffix && (
           <button
             type="button"
-            className="absolute right-4 top-1/2 -translate-y-1/2"
+            className="absolute right-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center"
             onClick={() => setPasswordVisible(!passwordVisible)}
+            aria-label={passwordVisible ? "Hide password" : "Show password"}
           >
             <span className="material-icons text-xl" style={{ color: AppColors.grey }}>
               {passwordVisible ? "visibility" : "visibility_off"}
             </span>
           </button>
         )}
+
         {suffix && !isDateField && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2">{suffix}</div>
         )}
       </div>
-      {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+
+      {canPickDate && (
+        <DatePickerPopover
+          open={dateOpen}
+          anchorEl={anchorRef.current}
+          value={currentValue}
+          onClose={() => setDateOpen(false)}
+          onSelect={(formatted, date) => {
+            handleChange(formatted);
+            if (formatted) {
+              onDateChange?.(date);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

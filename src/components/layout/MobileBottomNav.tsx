@@ -5,6 +5,7 @@ import { AppAsset } from "@/components/ui/AppAsset";
 import { AppColors } from "@/constants/colors";
 import { bottomBarItems, useBottomBarStore } from "@/stores/bottom-bar-store";
 import { bottomNavRoutes, isDashboardRoute } from "@/constants/navigation";
+import { RouteName } from "@/constants/routes";
 
 export function MobileBottomNav() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export function MobileBottomNav() {
 
   const getActiveIndex = () => {
     const idx = bottomNavRoutes.findIndex((href) => {
-      if (href === "/bottomBar") return pathname === "/bottomBar";
+      if (href === RouteName.dashboard) return pathname === RouteName.dashboard;
       return pathname === href || pathname.startsWith(href + "/");
     });
     return idx >= 0 ? idx : currentIndex;

@@ -9,15 +9,17 @@ const BREAKPOINTS = {
   desktop: 1536,
 } as const;
 
+/** SSR-safe default — must match server + first client render to avoid hydration mismatch. */
+const SSR_WIDTH = 1280;
+
 export function useResponsive() {
-  const [width, setWidth] = useState(
-    typeof window !== "undefined" ? window.innerWidth : 1280
-  );
+  const [width, setWidth] = useState(SSR_WIDTH);
 
   useEffect(() => {
-    const onResize = () => setWidth(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    const sync = () => setWidth(window.innerWidth);
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
   }, []);
 
   const isMobile = width < BREAKPOINTS.mobile;

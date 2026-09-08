@@ -47,12 +47,7 @@ export function WelcomeScreen() {
               textColor={AppColors.greyishBlack}
               onClick={() => router.push(RouteName.login)}
             />
-            <AppButton
-              text="Guest Account"
-              backgroundColor={AppColors.lightGrey}
-              textColor={AppColors.black}
-              onClick={() => router.replace(RouteName.bottomBar)}
-            />
+          
             <PoweredBy />
           </div>
         </div>
@@ -83,7 +78,7 @@ export function WelcomeScreen() {
       </div>
       <div className="h-4" />
       <div className="px-4">
-        <AppButton text="Guest Account" backgroundColor={AppColors.bordercolor} textColor={AppColors.greyishBlack} onClick={() => router.replace(RouteName.bottomBar)} />
+        <AppButton text="Guest Account" backgroundColor={AppColors.bordercolor} textColor={AppColors.greyishBlack} onClick={() => router.replace(RouteName.dashboard)} />
       </div>
       <div className="h-6" />
       <PoweredBy />

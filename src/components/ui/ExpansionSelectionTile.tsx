@@ -20,17 +20,17 @@ export function ExpansionSelectionTile({
   selectedItem: externalSelected,
   onItemSelected,
   closeOnSelect = false,
-  defaultExpanded = true,
+  defaultExpanded = false,
 }: ExpansionSelectionTileProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [selectedItem, setSelectedItem] = useState(externalSelected ?? "");
 
   return (
-    <div>
+    <div className="relative">
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between"
+        className="relative z-20 w-full px-4 py-3 flex items-center justify-between"
         style={{
           backgroundColor: AppColors.primary,
           borderRadius: isExpanded ? "8px 8px 0 0" : "8px",
@@ -52,13 +52,16 @@ export function ExpansionSelectionTile({
       </button>
       {isExpanded && (
         <div
-          className="w-full py-4 bg-white"
+          className="absolute left-0 right-0 top-full z-30 w-full bg-white"
           style={{
             border: `1px solid rgba(140, 140, 161, 0.3)`,
             borderRadius: "0 0 8px 8px",
             boxShadow: "0 4px 4px rgba(140, 140, 161, 0.1)",
+            maxHeight: "280px",
+            overflowY: "auto",
           }}
         >
+          <div className="py-4">
           {widgetItems ??
             items?.map((item) => {
               const isSelected = item === externalSelected || item === selectedItem;
@@ -80,9 +83,10 @@ export function ExpansionSelectionTile({
                   <span className="text-sm text-black" style={{ fontFamily: "var(--font-poppins)" }}>
                     {item}
                   </span>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+          </div>
         </div>
       )}
     </div>

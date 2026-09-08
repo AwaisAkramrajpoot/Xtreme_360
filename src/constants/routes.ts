@@ -8,7 +8,7 @@ export const RouteName = {
   verifyOtp: "/verifyOtp",
   languageSelection: "/languageSelection",
   welcome: "/welcome",
-  bottomBar: "/bottomBar",
+  dashboard: "/dashboard",
   businessRegisteration: "/businessRegisteration",
   party: "/party",
   addParty: "/addParty",

@@ -9,7 +9,7 @@ export interface NavItem {
 }
 
 export const primaryNavItems: NavItem[] = [
-  { label: "Dashboard", href: RouteName.bottomBar, icon: AppImages.home, section: "primary" },
+  { label: "Dashboard", href: RouteName.dashboard, icon: AppImages.home, section: "primary" },
   { label: "Profile", href: "/profile", icon: AppImages.profile, section: "primary" },
   { label: "Quick Menu", href: "/quick-menu", icon: AppImages.quickMenu, section: "primary" },
   { label: "Reports", href: "/reports", icon: AppImages.reports, section: "primary" },
@@ -77,7 +77,7 @@ export function isAuthRoute(route: string): boolean {
 
 /** Bottom nav tab index → route (matches bottomBarItems order). */
 export const bottomNavRoutes = [
-  RouteName.bottomBar,
+  RouteName.dashboard,
   "/profile",
   "/quick-menu",
   "/reports",

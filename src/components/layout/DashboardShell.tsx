@@ -5,9 +5,13 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import { useResponsive } from "@/hooks/use-responsive";
 import { useSidebarStore } from "@/stores/sidebar-store";
+import { useAuthStore } from "@/stores/auth-store";
+import { useSessionProfileStore } from "@/stores/session-profile-store";
 import { LayoutProvider } from "./LayoutContext";
 import { DashboardHeader, DashboardSidebar } from "./DashboardSidebar";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { useSessionProfile } from "@/hooks/use-session-profile";
+import { useSettingsStore } from "@/stores/settings-store";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -17,10 +21,21 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
   const { isMobile, isTablet, isWebLayout } = useResponsive();
   const { mobileOpen, setMobileOpen, collapsed } = useSidebarStore();
+  const token = useAuthStore((s) => s.token);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const { loading, error } = useSessionProfile();
+  const loadedToken = useSessionProfileStore((s) => s.loadedToken);
+  const loadSettings = useSettingsStore((s) => s.loadSettings);
+  const settingsLoaded = useSettingsStore((s) => s.loaded);
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname, setMobileOpen]);
+
+  useEffect(() => {
+    if (!hasHydrated || !token || settingsLoaded) return;
+    loadSettings().catch(() => undefined);
+  }, [hasHydrated, token, settingsLoaded, loadSettings]);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -41,6 +56,16 @@ export function DashboardShell({ children }: DashboardShellProps) {
     isTablet,
     isMobile,
   };
+
+  if (!hasHydrated || !token || loading || (!error && loadedToken !== token)) {
+    return (
+      <LayoutProvider value={layoutValue}>
+        <div className="flex h-dvh items-center justify-center bg-[#F5F6FA] text-sm text-[#6B7280]">
+          Loading dashboard...
+        </div>
+      </LayoutProvider>
+    );
+  }
 
   return (
     <LayoutProvider value={layoutValue}>

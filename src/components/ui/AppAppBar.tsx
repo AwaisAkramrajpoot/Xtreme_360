@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppColors } from "@/constants/colors";
 import { AppAsset } from "./AppAsset";
 import { AppImages } from "@/constants/images";
 import { useLayoutContext } from "@/components/layout/LayoutContext";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useSessionProfileStore } from "@/stores/session-profile-store";
 
 interface AppAppBarProps {
   title: string;
@@ -15,6 +17,9 @@ interface AppAppBarProps {
   showBack?: boolean;
   actions?: React.ReactNode;
   subtitle?: string;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
 }
 
 export function AppAppBar({
@@ -25,9 +30,32 @@ export function AppAppBar({
   showBack,
   actions,
   subtitle,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = "Search",
 }: AppAppBarProps) {
   const router = useRouter();
   const { isDashboardShell } = useLayoutContext();
+  const user = useSessionProfileStore((s) => s.user);
+  const avatarSrc = user?.profile_image ?? AppImages.staticUser;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [internalSearch, setInternalSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const resolvedSearch = searchValue ?? internalSearch;
+  const resolvedShowBack = showBack ?? true;
+
+  useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [searchOpen]);
+
+  const handleSearchChange = (value: string) => {
+    if (searchValue === undefined) {
+      setInternalSearch(value);
+    }
+    onSearchChange?.(value);
+  };
 
   if (isDashboardShell) {
     return (
@@ -36,9 +64,12 @@ export function AppAppBar({
         showNotification={showNotification}
         showAvatar={showAvatar}
         showSearch={showSearch}
-        showBack={showBack}
+        showBack={resolvedShowBack}
         actions={actions}
         subtitle={subtitle}
+        searchValue={resolvedSearch}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder={searchPlaceholder}
       />
     );
   }
@@ -49,7 +80,7 @@ export function AppAppBar({
       style={{ fontFamily: "var(--font-poppins)", borderColor: AppColors.lightGrey }}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        {showBack && (
+        {resolvedShowBack && (
           <button type="button" onClick={() => router.back()} className="p-1 -ml-1">
             <span className="material-icons text-black">arrow_back</span>
           </button>
@@ -60,15 +91,50 @@ export function AppAppBar({
         {actions}
         {showAvatar && (
           <AppAsset
-            src={AppImages.staticUser}
+            src={avatarSrc}
             width={36}
             height={36}
-            className="rounded-full"
+            className="h-9 w-9 shrink-0 rounded-full object-cover"
           />
         )}
         {showSearch && (
-          <div className="ml-3">
-            <AppAsset src={AppImages.search} width={24} height={24} />
+          <div className="ml-3 flex items-center">
+            {searchOpen ? (
+              <div className="flex h-10 items-center rounded-full border bg-white px-3" style={{ borderColor: AppColors.lightGrey }}>
+                <span className="material-icons text-sm" style={{ color: AppColors.grey }}>
+                  search
+                </span>
+                <input
+                  ref={searchInputRef}
+                  type="search"
+                  value={resolvedSearch}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="ml-2 w-36 bg-transparent text-sm outline-none sm:w-48"
+                />
+                {resolvedSearch && (
+                  <button
+                    type="button"
+                    onClick={() => handleSearchChange("")}
+                    className="ml-2 rounded-full p-1 hover:bg-black/5"
+                    aria-label="Clear search"
+                  >
+                    <span className="material-icons text-sm" style={{ color: AppColors.grey }}>
+                      close
+                    </span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="rounded-lg p-2 hover:bg-black/5"
+                aria-label="Open search"
+              >
+                <AppAsset src={AppImages.search} width={24} height={24} />
+              </button>
+            )}
           </div>
         )}
         {showNotification && (

@@ -22,6 +22,11 @@ import {
   BackupAndRestoreScreen,
 } from "@/features/app/hub/MenuHubScreen";
 import { SettingsScreen } from "@/features/app/settings/SettingsScreen";
+import { GeneralSettingsScreen } from "@/features/app/settings/GeneralSettingsScreen";
+import { TransactionSettingsScreen } from "@/features/app/settings/TransactionSettingsScreen";
+import { InvoicePrintScreen } from "@/features/app/settings/InvoicePrintScreen";
+import { TaxListScreen } from "@/features/app/settings/TaxListScreen";
+import { RemindersScreen } from "@/features/app/settings/RemindersScreen";
 import { PartyScreen, ExpenseScreen, EmployeeScreen } from "@/features/app/lists/ListScreens";
 import {
   AddPartyScreen,
@@ -35,6 +40,16 @@ import {
   GenericTransactionScreen,
   AddFormScreen,
 } from "@/features/app/forms/AddFormScreens";
+import {
+  QuotationScreen,
+  SaleOrderScreen,
+  SalesInvoiceScreen,
+  PaymentInScreen,
+  SalesReturnScreen,
+  DeliveryNoteScreen,
+  SalesAddRedirectScreen,
+} from "@/features/app/sales/SalesDocumentScreen";
+import { SALES_MODULES } from "@/features/app/sales/sales-config";
 import { ItemManagementScreen } from "@/features/app/misc/ItemManagementScreen";
 import {
   CalendarScreen,
@@ -66,7 +81,7 @@ export const screenRegistry: Record<string, ScreenComponent> = {
   "/verifyOtp": VerifyOtpPage,
   "/languageSelection": LanguageSelectionScreen,
   "/welcome": WelcomeScreen,
-  "/bottomBar": BottomBarLayout,
+  "/dashboard": BottomBarLayout,
   "/profile": ProfileScreen,
   "/quick-menu": QuickMenuScreen,
   "/reports": ReportsScreen,
@@ -86,18 +101,18 @@ export const screenRegistry: Record<string, ScreenComponent> = {
   "/addManufacturing": () => <AddFormScreen title="Add Manufacturing" fields={[{ title: "Manufacturing Name", hintText: "Enter name" }]} />,
   "/setConversion": () => <AddFormScreen title="Set Conversion" fields={[{ title: "From Unit", hintText: "Select unit" }, { title: "To Unit", hintText: "Select unit" }, { title: "Conversion Rate", hintText: "1.0" }]} />,
   "/sales": SalesScreen,
-  "/quotation": () => <GenericTransactionScreen title="Quotation" />,
-  "/addQuotation": () => <AddFormScreen title="Add Quotation" submitLabel="Save Quotation" fields={[{ title: "Party", hintText: "Select party" }, { title: "Date", hintText: "dd/mm/yyyy", isDate: true }, { title: "Valid Until", hintText: "dd/mm/yyyy", isDate: true }]} />,
-  "/saleOrder": () => <GenericTransactionScreen title="Sale Order" />,
-  "/addSaleOrder": () => <AddFormScreen title="Add Sale Order" submitLabel="Save Order" fields={[{ title: "Party", hintText: "Select party" }, { title: "Date", hintText: "dd/mm/yyyy", isDate: true }]} />,
-  "/salesInvoice": () => <GenericTransactionScreen title="Sales Invoice" />,
-  "/addSalesInvoice": () => <AddFormScreen title="Add Sales Invoice" submitLabel="Save Invoice" fields={[{ title: "Party", hintText: "Select party" }, { title: "Invoice Date", hintText: "dd/mm/yyyy", isDate: true }]} />,
-  "/paymentIn": () => <GenericTransactionScreen title="Payment In" />,
-  "/addPaymentIn": () => <AddFormScreen title="Add Payment In" submitLabel="Save Payment" fields={[{ title: "Party", hintText: "Select party" }, { title: "Amount", hintText: "0.00" }, { title: "Date", hintText: "dd/mm/yyyy", isDate: true }]} />,
-  "/salesReturn": () => <GenericTransactionScreen title="Sales Return" />,
-  "/addSalesReturn": () => <AddFormScreen title="Add Sales Return" submitLabel="Save Return" fields={[{ title: "Party", hintText: "Select party" }, { title: "Date", hintText: "dd/mm/yyyy", isDate: true }]} />,
-  "/deliveryNote": () => <GenericTransactionScreen title="Delivery Note" />,
-  "/addDeliveryNote": () => <AddFormScreen title="Add Delivery Note" submitLabel="Save" fields={[{ title: "Party", hintText: "Select party" }, { title: "Date", hintText: "dd/mm/yyyy", isDate: true }]} />,
+  "/quotation": QuotationScreen,
+  "/addQuotation": () => <SalesAddRedirectScreen config={SALES_MODULES.quotation} />,
+  "/saleOrder": SaleOrderScreen,
+  "/addSaleOrder": () => <SalesAddRedirectScreen config={SALES_MODULES.sale_order} />,
+  "/salesInvoice": SalesInvoiceScreen,
+  "/addSalesInvoice": () => <SalesAddRedirectScreen config={SALES_MODULES.sales_invoice} />,
+  "/paymentIn": PaymentInScreen,
+  "/addPaymentIn": () => <SalesAddRedirectScreen config={SALES_MODULES.payment_in} />,
+  "/salesReturn": SalesReturnScreen,
+  "/addSalesReturn": () => <SalesAddRedirectScreen config={SALES_MODULES.sales_return} />,
+  "/deliveryNote": DeliveryNoteScreen,
+  "/addDeliveryNote": () => <SalesAddRedirectScreen config={SALES_MODULES.delivery_note} />,
   "/purchase": PurchaseScreen,
   "/purchaseOrder": () => <GenericTransactionScreen title="Purchase Order" />,
   "/addPurchaseOrder": () => <AddFormScreen title="Add Purchase Order" submitLabel="Save Order" fields={[{ title: "Party", hintText: "Select party" }, { title: "Date", hintText: "dd/mm/yyyy", isDate: true }]} />,
@@ -126,11 +141,11 @@ export const screenRegistry: Record<string, ScreenComponent> = {
   "/marketing": MarketingScreen,
   "/utilities": UtilitiesScreen,
   "/settings": SettingsScreen,
-  "/generalSettings": () => <AddFormScreen title="General Settings" submitLabel="Save" fields={[{ title: "Currency", hintText: "PKR" }, { title: "Date Format", hintText: "dd/MM/yyyy" }, { title: "Decimal Places", hintText: "2" }]} />,
-  "/transactionSettings": () => <AddFormScreen title="Transaction Settings" submitLabel="Save" fields={[{ title: "Enable GST", hintText: "Yes/No" }, { title: "Default Tax Rate", hintText: "0%" }]} />,
-  "/invoicePrint": () => <AddFormScreen title="Invoice Print" submitLabel="Save" fields={[{ title: "Paper Size", hintText: "A4" }, { title: "Header Text", hintText: "Enter header" }]} />,
-  "/taxes": () => <AddFormScreen title="Taxes" submitLabel="Save" fields={[{ title: "Tax Name", hintText: "GST" }, { title: "Tax Rate", hintText: "17%" }]} />,
-  "/reminders": () => <AddFormScreen title="Reminders" submitLabel="Save" fields={[{ title: "Payment Reminder", hintText: "Days before due" }, { title: "Low Stock Alert", hintText: "Threshold qty" }]} />,
+  "/generalSettings": GeneralSettingsScreen,
+  "/transactionSettings": TransactionSettingsScreen,
+  "/invoicePrint": InvoicePrintScreen,
+  "/taxes": TaxListScreen,
+  "/reminders": RemindersScreen,
   "/itemSettings": () => <AddFormScreen title="Item Settings" submitLabel="Save" fields={[{ title: "Enable Barcode", hintText: "Yes/No" }, { title: "Default Unit", hintText: "Select unit" }]} />,
   "/partySettings": () => <AddFormScreen title="Party Settings" submitLabel="Save" fields={[{ title: "Credit Limit", hintText: "0.00" }, { title: "Payment Terms", hintText: "30 days" }]} />,
   "/profileDetail": ProfileDetailScreen,

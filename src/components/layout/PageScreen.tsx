@@ -53,7 +53,7 @@ export function PageScreen({ route }: PageScreenProps) {
     );
   }
 
-  if (route === "/bottomBar") {
+  if (route === "/dashboard") {
     return <Screen />;
   }
 

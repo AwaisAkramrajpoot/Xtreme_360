@@ -16,10 +16,12 @@ import {
 import { RouteName } from "@/constants/routes";
 import { useSidebarStore } from "@/stores/sidebar-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useSessionProfileStore } from "@/stores/session-profile-store";
 import { useResponsive } from "@/hooks/use-responsive";
+import { logoutUser } from "@/services/session-api";
 
 function isNavActive(pathname: string, href: string) {
-  if (href === RouteName.bottomBar) return pathname === RouteName.bottomBar;
+  if (href === RouteName.dashboard) return pathname === RouteName.dashboard;
   return pathname === href || pathname.startsWith(href + "/");
 }
 
@@ -128,12 +130,23 @@ export function DashboardSidebar({ onNavigate, isDrawer, onClose }: DashboardSid
   const router = useRouter();
   const { collapsed } = useSidebarStore();
   const logout = useAuthStore((s) => s.logout);
+  const user = useSessionProfileStore((s) => s.user);
+  const business = useSessionProfileStore((s) => s.business);
   const showCollapsed = isDrawer ? false : collapsed;
+  const accountName = business?.name ?? user?.name ?? "Account";
+  const accountEmail = user?.email ?? "";
+  const avatarSrc = user?.profile_image ?? AppImages.staticUser;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm("Are you sure you want to log out?")) {
       onNavigate?.();
+      try {
+        await logoutUser();
+      } catch {
+        // Clear local session even if the API call fails.
+      }
       logout();
+      useSessionProfileStore.getState().clearSessionProfile();
       router.replace(RouteName.welcome);
     }
   };
@@ -226,6 +239,24 @@ export function DashboardSidebar({ onNavigate, isDrawer, onClose }: DashboardSid
           className="shrink-0 border-t p-3 safe-area-bottom"
           style={{ borderColor: AppColors.lightGrey }}
         >
+          <div className="mb-3 rounded-2xl border border-black/5 bg-[#FAFBFD] p-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <AppAsset
+                src={avatarSrc}
+                width={40}
+                height={40}
+                className="h-10 w-10 shrink-0 rounded-full object-cover"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-black leading-tight">{accountName}</p>
+                {accountEmail && (
+                  <p className="truncate text-xs leading-tight" style={{ color: AppColors.grey }}>
+                    {accountEmail}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
           <button
             type="button"
             onClick={handleLogout}
@@ -250,6 +281,11 @@ export function DashboardHeader() {
   const { isWebLayout } = useResponsive();
   const { toggleCollapsed, setMobileOpen } = useSidebarStore();
   const logout = useAuthStore((s) => s.logout);
+  const user = useSessionProfileStore((s) => s.user);
+  const business = useSessionProfileStore((s) => s.business);
+  const accountName = business?.name ?? user?.name ?? "Account";
+  const accountEmail = user?.email ?? "";
+  const avatarSrc = user?.profile_image ?? AppImages.staticUser;
 
   const handleMenuClick = () => {
     if (isWebLayout) toggleCollapsed();
@@ -295,18 +331,31 @@ export function DashboardHeader() {
           style={{ borderColor: AppColors.lightGrey }}
         >
           <div className="text-right hidden lg:block">
-            <p className="text-sm font-semibold text-black leading-tight">John Doe</p>
-            <p className="text-xs" style={{ color: AppColors.grey }}>
-              Xtreme 360
-            </p>
+            <p className="text-sm font-semibold text-black leading-tight">{accountName}</p>
+            {accountEmail && (
+              <p className="text-xs truncate max-w-[180px]" style={{ color: AppColors.grey }}>
+                {accountEmail}
+              </p>
+            )}
           </div>
-          <AppAsset src={AppImages.staticUser} width={36} height={36} className="rounded-full" />
+          <AppAsset
+            src={avatarSrc}
+            width={36}
+            height={36}
+            className="h-9 w-9 shrink-0 rounded-full object-cover"
+          />
         </div>
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             if (confirm("Are you sure you want to log out?")) {
+              try {
+                await logoutUser();
+              } catch {
+                // Clear local session even if the API call fails.
+              }
               logout();
+              useSessionProfileStore.getState().clearSessionProfile();
               router.replace(RouteName.welcome);
             }
           }}
