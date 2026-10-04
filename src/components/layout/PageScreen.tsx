@@ -1,10 +1,17 @@
 "use client";
 
-import { screenRegistry } from "@/lib/screen-registry";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { resolveScreen } from "@/lib/screen-registry";
 import { isDashboardRoute, isAuthRoute } from "@/constants/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { LayoutProvider } from "@/components/layout/LayoutContext";
 import { useResponsive } from "@/hooks/use-responsive";
+import { RouteName } from "@/constants/routes";
+import { useAuthStore } from "@/stores/auth-store";
+
+/** Signed-in users are sent to the dashboard instead of seeing these screens again. */
+const SIGNED_OUT_ONLY_ROUTES: string[] = [RouteName.login, RouteName.register, RouteName.welcome];
 
 interface PageScreenProps {
   route: string;
@@ -15,10 +22,20 @@ function DashboardPageWrapper({ children }: { children: React.ReactNode }) {
 }
 
 export function PageScreen({ route }: PageScreenProps) {
-  const Screen = screenRegistry[route];
+  const screen = resolveScreen(route);
   const { isWebLayout, isMobile, isTablet } = useResponsive();
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
+  const redirectToDashboard = hasHydrated && Boolean(token) && SIGNED_OUT_ONLY_ROUTES.includes(route);
 
-  if (!Screen) {
+  useEffect(() => {
+    if (redirectToDashboard) router.replace(RouteName.dashboard);
+  }, [redirectToDashboard, router]);
+
+  if (redirectToDashboard) return null;
+
+  if (!screen) {
     return (
       <LayoutProvider
         value={{ isDashboardShell: false, isDesktop: false, isTablet: false, isMobile: false }}
@@ -38,7 +55,7 @@ export function PageScreen({ route }: PageScreenProps) {
           isMobile,
         }}
       >
-        <Screen />
+        {screen}
       </LayoutProvider>
     );
   }
@@ -48,18 +65,18 @@ export function PageScreen({ route }: PageScreenProps) {
       <LayoutProvider
         value={{ isDashboardShell: false, isDesktop: false, isTablet, isMobile }}
       >
-        <Screen />
+        {screen}
       </LayoutProvider>
     );
   }
 
   if (route === "/dashboard") {
-    return <Screen />;
+    return screen;
   }
 
   return (
     <DashboardPageWrapper>
-      <Screen />
+      {screen}
     </DashboardPageWrapper>
   );
 }

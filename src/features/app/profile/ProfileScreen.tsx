@@ -83,9 +83,9 @@ export function ProfileScreen() {
   );
 
   return (
-    <div className="min-h-full bg-white flex flex-col">
+    <div className="flex min-h-full flex-col">
       <AppAppBar title="Profile" showNotification />
-      <div className="flex-1 overflow-auto px-[18px] py-1.5">
+      <div className="flex-1">
         <div className="flex flex-col items-center gap-2.5 mb-4">
           <div className="relative group">
             <input

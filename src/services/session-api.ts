@@ -16,8 +16,14 @@ export type RegisterResult = {
   email: string;
 };
 
+/** Super Admin approval of a self-registered account. */
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export type OtpResult = {
+  /** Empty when no session was started (a password reset, or an account awaiting approval). */
   accessToken: string;
+  approvalStatus?: ApprovalStatus;
+  message: string;
 };
 
 export type ResetPasswordPayload = {
@@ -51,6 +57,9 @@ export type UserProfile = {
   use_fingerprint?: boolean | null;
   use_face_recognition?: boolean | null;
   is_verified?: boolean;
+  /** owner | manager | staff */
+  role?: string;
+  is_owner?: boolean;
   created_at?: string;
   updated_at?: string;
   businesses?: BusinessRecord[];
@@ -112,10 +121,12 @@ export async function sendPasswordResetOtp(email: string) {
   return unwrap(response);
 }
 
-export async function verifyOtp(payload: { email: string; otp: string }) {
-  const response = await apiClient.post<ApiEnvelope<OtpResult>>("/auth/verify-otp", payload);
-  const data = unwrap(response) as OtpResult & { access_token?: string };
-  return { accessToken: normalizeToken(data) };
+export async function verifyOtp(payload: { email: string; otp: string }): Promise<OtpResult> {
+  const response = await apiClient.post<
+    ApiEnvelope<{ access_token?: string; accessToken?: string; approval_status?: ApprovalStatus }>
+  >("/auth/verify-otp", payload);
+  const data = unwrap(response) ?? {};
+  return { accessToken: normalizeToken(data), approvalStatus: data.approval_status, message: response.data.message };
 }
 
 export async function resetPassword(payload: ResetPasswordPayload) {

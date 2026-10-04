@@ -1,141 +1,101 @@
 "use client";
 
-import { useState } from "react";
-import { AppAppBar } from "@/components/ui/AppAppBar";
-import { AppSwitch } from "@/components/ui/AppSwitch";
 import { AppColors } from "@/constants/colors";
+import {
+  SettingsLayout,
+  SettingsSection,
+  SettingsSelectRow,
+  SettingsStepperRow,
+  SettingsIcon,
+  SettingsToggleRow,
+  useSettingsScreen,
+  useSettingsSection,
+} from "./SettingsUi";
 
-function SectionCard({
-  title,
-  children,
-  defaultOpen = true,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
+const FREQUENCIES = ["Once a Day", "Twice a Day", "Once a Week"] as const;
+
+const BENEFITS = [
+  { icon: "notifications_active", text: "Remind your parties" },
+  { icon: "favorite", text: "Don't lose customers" },
+  { icon: "trending_up", text: "Grow your business" },
+];
+
+function RemindersContent() {
+  const { values, update, isBusy } = useSettingsSection("reminders");
+  const { query } = useSettingsScreen();
 
   return (
-    <div className="overflow-hidden rounded-md border" style={{ borderColor: AppColors.lightGrey }}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-3 py-2 text-left"
-        style={{ backgroundColor: AppColors.primary }}
-      >
-        <span className="text-sm text-white">{title}</span>
-        <span className="material-icons text-white">
-          {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
-        </span>
-      </button>
-      {open && <div className="space-y-2 bg-white p-2">{children}</div>}
-    </div>
-  );
-}
+    <>
+      <SettingsSection title="Payment Reminder" icon="alarm">
+        <SettingsToggleRow
+          label="Self payment reminder"
+          description="Get reminded about payments you are due to collect."
+          value={values.selfPaymentReminder}
+          busy={isBusy("selfPaymentReminder")}
+          onChange={(v) => void update("selfPaymentReminder", v)}
+        />
+        <SettingsStepperRow
+          label="Remind me for payment due more than"
+          value={values.daysBeforeDue}
+          suffix="days"
+          min={0}
+          max={90}
+          disabled={!values.selfPaymentReminder}
+          busy={isBusy("daysBeforeDue")}
+          onChange={(v) => void update("daysBeforeDue", v)}
+        />
+        <SettingsSelectRow
+          label="Reminder frequency"
+          value={values.reminderFrequency}
+          options={FREQUENCIES}
+          disabled={!values.selfPaymentReminder}
+          busy={isBusy("reminderFrequency")}
+          onChange={(v) => void update("reminderFrequency", v)}
+        />
+      </SettingsSection>
 
-function ToggleRow({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <div className="flex min-h-10 items-center justify-between rounded-md px-3" style={{ backgroundColor: AppColors.bgColor2 }}>
-      <span className="text-xs text-black">{label}</span>
-      <AppSwitch value={value} onChange={onChange} />
-    </div>
-  );
-}
+      <SettingsSection title="Payment Reminder for Party" icon="forward_to_inbox">
+        <SettingsToggleRow
+          label="Send payment reminders to parties"
+          description="Remind parties about their outstanding balance."
+          value={values.partyPaymentReminder}
+          busy={isBusy("partyPaymentReminder")}
+          onChange={(v) => void update("partyPaymentReminder", v)}
+        />
+      </SettingsSection>
 
-function CounterRow({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="flex min-h-10 items-center justify-between rounded-md px-3" style={{ backgroundColor: AppColors.bgColor2 }}>
-      <span className="text-xs text-black">{label}</span>
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={() => onChange(Math.max(0, value - 1))} className="text-base" style={{ color: AppColors.primary }}>-</button>
-        <span className="w-4 text-center text-sm">{value}</span>
-        <button type="button" onClick={() => onChange(Math.min(9, value + 1))} className="text-base" style={{ color: AppColors.primary }}>+</button>
-      </div>
-    </div>
-  );
-}
-
-function ArrowRow({ label, value }: { label: string; value?: string }) {
-  return (
-    <button type="button" className="flex min-h-10 w-full items-center justify-between rounded-md px-3 text-left" style={{ backgroundColor: AppColors.bgColor2 }}>
-      <span className="text-xs text-black">{label}</span>
-      <div className="flex items-center gap-2">
-        {value && <span className="text-xs" style={{ color: AppColors.grey }}>{value}</span>}
-        <span className="material-icons text-black">chevron_right</span>
-      </div>
-    </button>
+      <SettingsSection title="Service Reminders" icon="build_circle">
+        <SettingsToggleRow
+          label="Service reminders"
+          description="Remind customers when a periodic service is due."
+          value={values.serviceReminders}
+          busy={isBusy("serviceReminders")}
+          onChange={(v) => void update("serviceReminders", v)}
+        />
+        {!query.trim() && (
+          <div className="px-4 py-3" style={{ borderColor: "#F0F0F0" }}>
+            <p className="text-xs font-semibold text-black">Benefits of service reminders</p>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {BENEFITS.map((b) => (
+                <div key={b.text} className="flex flex-col items-center text-center">
+                  <SettingsIcon name={b.icon} />
+                  <p className="mt-1.5 text-[11px]" style={{ color: AppColors.grey }}>
+                    {b.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </SettingsSection>
+    </>
   );
 }
 
 export function RemindersScreen() {
-  const [selfReminder, setSelfReminder] = useState(false);
-  const [daysBefore, setDaysBefore] = useState(0);
-
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <AppAppBar title="Reminders" showBack showSearch />
-      <div className="flex-1 overflow-auto px-2 pb-4 pt-2 sm:px-3">
-        <div className="space-y-2">
-          <SectionCard title="Payment Reminder">
-            <ToggleRow label="Self Payment Reminder" value={selfReminder} onChange={setSelfReminder} />
-            <CounterRow label="Remind me for payment due more than" value={daysBefore} onChange={setDaysBefore} />
-            <ArrowRow label="Self Payment Reminder" value="Once a Day" />
-          </SectionCard>
-
-          <SectionCard title="Payment Reminder For party">
-            <ArrowRow label="Reminder message to party" />
-          </SectionCard>
-
-          <SectionCard title="Service Reminders">
-            <div className="rounded-md p-3" style={{ backgroundColor: AppColors.bgColor2 }}>
-              <p className="text-xs font-semibold text-black">Benefit of Service Rrminders:</p>
-              <div className="mt-2 grid grid-cols-3 gap-3">
-                <div className="text-center">
-                  <div className="mx-auto h-7 w-7 rounded-md bg-[#E8E8E8]" />
-                  <p className="mt-1 text-[10px]" style={{ color: AppColors.grey }}>Remind your Parties</p>
-                </div>
-                <div className="text-center">
-                  <div className="mx-auto h-7 w-7 rounded-md bg-[#E8E8E8]" />
-                  <p className="mt-1 text-[10px]" style={{ color: AppColors.grey }}>Don&apos;t lose customers</p>
-                </div>
-                <div className="text-center">
-                  <div className="mx-auto h-7 w-7 rounded-md bg-[#E8E8E8]" />
-                  <p className="mt-1 text-[10px]" style={{ color: AppColors.grey }}>Grow your business</p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="mt-3 flex w-full items-center justify-between rounded-md bg-[#111] px-2 py-1.5 text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="material-icons text-[#7AC65E]">play_circle</span>
-                  <span className="text-[11px] text-white">How does Service Reminders work in Xtreme 360 ?</span>
-                </div>
-                <span className="text-[11px] text-[#7AC65E]">Watch Video</span>
-              </button>
-            </div>
-          </SectionCard>
-        </div>
-      </div>
-    </div>
+    <SettingsLayout title="Reminders">
+      <RemindersContent />
+    </SettingsLayout>
   );
 }
-

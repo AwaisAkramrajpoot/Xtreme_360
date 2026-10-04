@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppAppBar } from "@/components/ui/AppAppBar";
 import { AppColors } from "@/constants/colors";
 import { quickMenuItems } from "@/constants/menu-data";
+import { useRouteEnabled } from "@/hooks/use-route-enabled";
 
 const QUICK_MENU_META: Record<string, { icon: string; tint: string }> = {
   Quotation:        { icon: "request_quote",   tint: "#E8F1E8" },
@@ -24,6 +25,8 @@ const QUICK_MENU_META: Record<string, { icon: string; tint: string }> = {
 export function QuickMenuScreen() {
   const router = useRouter();
   const [busyIndex, setBusyIndex] = useState<number | null>(null);
+  const isEnabled = useRouteEnabled();
+  const visibleItems = quickMenuItems.filter((item) => isEnabled(item.href));
 
   const handleClick = async (index: number, href?: string) => {
     setBusyIndex(index);
@@ -35,10 +38,10 @@ export function QuickMenuScreen() {
   };
 
   return (
-    <div className="flex min-h-full flex-col bg-[#F7F8FB]">
+    <div className="flex min-h-full flex-col">
       <AppAppBar title="Quick Menu" showNotification showSearch />
 
-      <div className="flex-1 px-1 pb-8 pt-4 sm:px-2">
+      <div className="flex-1 pb-8">
         <div className="mb-5">
           <h2
             className="text-xl font-bold text-black sm:text-2xl"
@@ -52,7 +55,7 @@ export function QuickMenuScreen() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
-          {quickMenuItems.map((item, index) => {
+          {visibleItems.map((item, index) => {
             const meta = QUICK_MENU_META[item.title] ?? { icon: "bolt", tint: "#F0F1F5" };
             const active = busyIndex === index;
 

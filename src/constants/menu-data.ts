@@ -38,7 +38,7 @@ export const mainMenuItems: MenuItem[] = [
   { title: "Marketing", image: AppImages.marketing, href: RouteName.marketing },
   { title: "Backup & Restore", image: AppImages.backupRestore, href: RouteName.backUpAndRestore },
   { title: "Calendar", image: AppImages.calendar, href: RouteName.calendar },
-  { title: "POS", image: AppImages.item, href: RouteName.posList },
+  { title: "POS", image: AppImages.item, href: RouteName.pos },
   { title: "Plans & Pricing", image: AppImages.plansPricing, href: RouteName.plansAndPricing },
   { title: "Setting", image: AppImages.setting, href: RouteName.settings },
   { title: "Log Out" },
@@ -65,6 +65,10 @@ export const cashBankItems: MenuItem[] = [
   { title: "Cash in hand", href: RouteName.cashInHand },
   { title: "Cheques", href: RouteName.cheque },
   { title: "Loan amount", href: RouteName.loanAmount },
+  { title: "Bank to Cash", href: RouteName.bankToCashTransfer },
+  { title: "Cash to Bank", href: RouteName.cashToBankTransfer },
+  { title: "Bank to Bank", href: RouteName.bankToBankTransfer },
+  { title: "Adjust Bank Balance", href: RouteName.adjustBankBalance },
 ];
 
 export const utilitiesItems: MenuItem[] = [
@@ -74,6 +78,7 @@ export const utilitiesItems: MenuItem[] = [
   { title: "Import from billbook", href: RouteName.importBillbook },
   { title: "Recycle bin", href: RouteName.recycleBin },
   { title: "Close financial years", href: RouteName.closingFinancialYears },
+  { title: "Help & Support", href: RouteName.helpSupport },
 ];
 
 export const settingsItems: MenuItem[] = [
@@ -86,16 +91,8 @@ export const settingsItems: MenuItem[] = [
   { title: "Party", image: AppImages.party, href: RouteName.partySettings },
 ];
 
-export const backupAndRestoreItems: MenuItem[] = [
-  { title: "Auto back up" },
-  { title: "Backup for phone" },
-  { title: "Backup to email id" },
-  { title: "Restote backup" },
-];
-
 export const marketingItems: MenuItem[] = [
-  { title: "Google profile management" },
-  { title: "Whatsapp marketing" },
+  { title: "WhatsApp marketing", href: RouteName.whatsappMarketing },
 ];
 
 export const reportGroups = [

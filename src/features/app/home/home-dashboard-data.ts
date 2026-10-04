@@ -1,33 +1,58 @@
 import { AppImages } from "@/constants/images";
+import { formatMoney, type GeneralUiSettings } from "@/constants/app-settings";
+import type { DashboardSummary, MonthOverMonth } from "@/services/dashboard-api";
 
 export interface DashboardMetric {
   title: string;
   amount: string;
   percentageText: string;
-  isPositive: boolean;
+  /** true = good (green), false = bad (red), null = informational (grey). */
+  isPositive: boolean | null;
   icon: string;
 }
 
-export const homeDashboardMetrics: DashboardMetric[] = [
-  { title: "Cash Flow", amount: "Rs 100,000", percentageText: "+12.5% from last month", isPositive: true, icon: AppImages.cashFlow },
-  { title: "Bank Balance", amount: "Rs 200,000", percentageText: "+12.5% from last month", isPositive: true, icon: AppImages.bank },
-  { title: "Total Sale", amount: "Rs 800,000", percentageText: "+12.5% from last month", isPositive: true, icon: AppImages.totalSales },
-  { title: "Sale Returns", amount: "Rs 50,000", percentageText: "-12.5% from last month", isPositive: false, icon: AppImages.saleReturns },
-  { title: "Outstanding (Receivable)", amount: "Rs 10,00,000", percentageText: "+12.5% from last month", isPositive: true, icon: AppImages.receivable },
-  { title: "Outstanding (Payable)", amount: "Rs 3,00,000", percentageText: "+12.5% from last month", isPositive: false, icon: AppImages.payable },
-  { title: "Purchases", amount: "Rs 7,50,000", percentageText: "-12.5% from last month", isPositive: false, icon: AppImages.purchases },
-  { title: "Purchases Returns", amount: "Rs 50,000", percentageText: "-12.5% from last month", isPositive: false, icon: AppImages.saleReturns },
-];
+type Money = Pick<GeneralUiSettings, "currency" | "decimalPlaces">;
 
-export const quotationMetrics = [
-  { count: "24", label: "Pending" },
-  { count: "142", label: "Approved" },
-  { count: "12", label: "Rejected" },
-  { count: "121", label: "Total" },
-];
+/** "+12.5% from last month" style text for a month-over-month flow. */
+function trend(value: MonthOverMonth, higherIsBetter: boolean) {
+  if (!value.previous) {
+    return {
+      percentageText: value.current ? "No data for last month" : "No activity this month",
+      isPositive: null,
+    };
+  }
+  const change = ((value.current - value.previous) / Math.abs(value.previous)) * 100;
+  const sign = change > 0 ? "+" : "";
+  return {
+    percentageText: `${sign}${change.toFixed(1)}% from last month`,
+    isPositive: change === 0 ? null : change > 0 === higherIsBetter,
+  };
+}
 
-export const inventoryMetrics = [
-  { title: "Current Inventory", value: "$8,248", subValue: "1250 items", progress: 0.7 },
-  { title: "Low Stock Items", value: "$8,248", subValue: "1250 items", progress: 0.4 },
-  { title: "Dead stock", value: "$8,248", subValue: "1250 items", progress: 0.25 },
-];
+export function buildDashboardMetrics(summary: DashboardSummary, money: Money): DashboardMetric[] {
+  const fmt = (value: number) => formatMoney(value, money);
+  const flow = (title: string, icon: string, value: MonthOverMonth, higherIsBetter: boolean) => ({
+    title,
+    icon,
+    amount: fmt(value.current),
+    ...trend(value, higherIsBetter),
+  });
+  const balance = (title: string, icon: string, value: number, note: string) => ({
+    title,
+    icon,
+    amount: fmt(value),
+    percentageText: note,
+    isPositive: null,
+  });
+
+  return [
+    flow("Cash Flow", AppImages.cashFlow, summary.cashFlow, true),
+    balance("Bank Balance", AppImages.bank, summary.bankBalance, "Across all bank accounts"),
+    flow("Total Sale", AppImages.totalSales, summary.sales, true),
+    flow("Sale Returns", AppImages.saleReturns, summary.salesReturns, false),
+    balance("Outstanding (Receivable)", AppImages.receivable, summary.receivable, "Unpaid sales invoices"),
+    balance("Outstanding (Payable)", AppImages.payable, summary.payable, "Unpaid purchase bills"),
+    flow("Purchases", AppImages.purchases, summary.purchases, false),
+    flow("Purchase Returns", AppImages.saleReturns, summary.purchaseReturns, true),
+  ];
+}

@@ -3,6 +3,9 @@ import { AppAsset } from "@/components/ui/AppAsset";
 import type { DashboardMetric } from "./home-dashboard-data";
 
 export function MetricCard({ metric }: { metric: DashboardMetric }) {
+  const trendColor =
+    metric.isPositive === null ? AppColors.grey : metric.isPositive ? AppColors.greenText : AppColors.redText;
+
   return (
     <div
       className="p-3 sm:p-4 bg-white rounded-xl flex flex-col h-full min-w-0"
@@ -27,13 +30,21 @@ export function MetricCard({ metric }: { metric: DashboardMetric }) {
       <div className="h-1" />
       <span
         className="text-[11px] sm:text-xs truncate"
-        style={{
-          color: metric.isPositive ? AppColors.greenText : AppColors.redText,
-          fontFamily: "var(--font-poppins)",
-        }}
+        style={{ color: trendColor, fontFamily: "var(--font-poppins)" }}
       >
         {metric.percentageText}
       </span>
+    </div>
+  );
+}
+
+export function MetricCardSkeleton() {
+  return (
+    <div className="flex h-full flex-col gap-3 rounded-xl bg-white p-3 sm:p-4" style={{ boxShadow: "0 4px 10px rgba(0,0,0,0.05)" }}>
+      <div className="h-3 w-2/3 animate-pulse rounded bg-[#ECEDEF]" />
+      <div className="flex-1" />
+      <div className="h-5 w-1/2 animate-pulse rounded bg-[#ECEDEF]" />
+      <div className="h-3 w-3/4 animate-pulse rounded bg-[#ECEDEF]" />
     </div>
   );
 }

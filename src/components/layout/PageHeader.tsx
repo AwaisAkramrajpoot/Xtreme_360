@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLayoutContext } from "./LayoutContext";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AppAsset } from "@/components/ui/AppAsset";
 import { AppImages } from "@/constants/images";
 import { AppColors } from "@/constants/colors";
 import { useSessionProfileStore } from "@/stores/session-profile-store";
+import { getParentRoute, shouldShowBack } from "@/constants/route-hierarchy";
 
 interface PageHeaderProps {
   title: string;
@@ -14,6 +15,7 @@ interface PageHeaderProps {
   showAvatar?: boolean;
   showSearch?: boolean;
   showBack?: boolean;
+  backHref?: string;
   actions?: React.ReactNode;
   subtitle?: string;
   searchValue?: string;
@@ -23,10 +25,10 @@ interface PageHeaderProps {
 
 export function PageHeader({
   title,
-  showNotification,
   showAvatar,
   showSearch,
   showBack,
+  backHref,
   actions,
   subtitle,
   searchValue,
@@ -35,13 +37,20 @@ export function PageHeader({
 }: PageHeaderProps) {
   const { isDashboardShell } = useLayoutContext();
   const router = useRouter();
+  const pathname = usePathname();
   const user = useSessionProfileStore((s) => s.user);
   const avatarSrc = user?.profile_image ?? AppImages.staticUser;
   const [searchOpen, setSearchOpen] = useState(false);
   const [internalSearch, setInternalSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const resolvedSearch = searchValue ?? internalSearch;
-  const resolvedShowBack = showBack ?? true;
+  const parent = backHref || getParentRoute(pathname || "");
+  const resolvedShowBack = showBack ?? shouldShowBack(pathname || "");
+
+  const handleBack = () => {
+    if (parent) router.push(parent);
+    else router.back();
+  };
 
   useEffect(() => {
     if (searchOpen) {
@@ -64,11 +73,13 @@ export function PageHeader({
             {resolvedShowBack && (
               <button
                 type="button"
-                onClick={() => router.back()}
-                className="flex items-center gap-1 text-sm font-medium mb-2 hover:opacity-70"
-                style={{ color: AppColors.primary }}
+                onClick={handleBack}
+                className="mb-3 inline-flex h-9 items-center gap-1.5 rounded-lg border bg-white pl-2 pr-3 text-sm font-semibold text-[#1F2937] shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-colors hover:bg-[#F3F4F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#588157]"
+                style={{ borderColor: AppColors.lightGrey }}
               >
-                <span className="material-icons text-base">arrow_back</span>
+                <span className="material-icons text-[18px]" aria-hidden>
+                  arrow_back
+                </span>
                 Back
               </button>
             )}
@@ -125,11 +136,6 @@ export function PageHeader({
                   </button>
                 )}
               </div>
-            )}
-            {showNotification && (
-              <button type="button" className="p-2 rounded-lg hover:bg-white transition-colors relative">
-                <AppAsset src={AppImages.bell} width={20} height={20} />
-              </button>
             )}
             {showAvatar && (
               <AppAsset

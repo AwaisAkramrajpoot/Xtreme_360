@@ -17,6 +17,16 @@ export type SalesModuleConfig = {
   showReturnReason?: boolean;
   showLinkedInvoice?: boolean;
   convertTargets?: Array<{ label: string; target: SalesDocType; route: string }>;
+  /** Party dropdown hint, e.g. "Select customer" / "Select supplier". */
+  partyHint?: string;
+  /** Document type offered in the "Linked ..." dropdown (payments and returns). */
+  linkedDocType?: SalesDocType;
+  linkedLabel?: string;
+  /** Item price copied into a new line. */
+  priceField?: "sale_price" | "purchase_price";
+  /** Card menu shortcuts. */
+  paymentRoute?: string;
+  returnRoute?: string;
 };
 
 export const SALES_MODULES: Record<string, SalesModuleConfig> = {
@@ -47,6 +57,8 @@ export const SALES_MODULES: Record<string, SalesModuleConfig> = {
     statuses: ["open", "partial", "completed", "cancelled"],
     showItems: true,
     showPartyDetails: true,
+    paymentRoute: RouteName.paymentIn,
+    returnRoute: RouteName.salesReturn,
     convertTargets: [
       { label: "Convert to Delivery Note", target: "delivery_note", route: RouteName.deliveryNote },
       { label: "Convert to Invoice", target: "sales_invoice", route: RouteName.salesInvoice },
@@ -63,6 +75,8 @@ export const SALES_MODULES: Record<string, SalesModuleConfig> = {
     statuses: ["unpaid", "partial", "paid", "cancelled"],
     showItems: true,
     showPartyDetails: true,
+    paymentRoute: RouteName.paymentIn,
+    returnRoute: RouteName.salesReturn,
   },
   payment_in: {
     docType: "payment_in",
@@ -75,6 +89,7 @@ export const SALES_MODULES: Record<string, SalesModuleConfig> = {
     showItems: false,
     showPaymentFields: true,
     showLinkedInvoice: true,
+    linkedDocType: "sales_invoice",
     showPartyDetails: true,
   },
   sales_return: {
@@ -88,6 +103,7 @@ export const SALES_MODULES: Record<string, SalesModuleConfig> = {
     showItems: true,
     showReturnReason: true,
     showLinkedInvoice: true,
+    linkedDocType: "sales_invoice",
     showPartyDetails: true,
   },
   delivery_note: {
@@ -104,5 +120,71 @@ export const SALES_MODULES: Record<string, SalesModuleConfig> = {
     convertTargets: [
       { label: "Convert to Invoice", target: "sales_invoice", route: RouteName.salesInvoice },
     ],
+  },
+  purchase_order: {
+    docType: "purchase_order",
+    title: "Purchase Order",
+    addTitle: "Add Purchase Order",
+    route: RouteName.purchaseOrder,
+    addRoute: RouteName.addPurchaseOrder,
+    docNoLabel: "Order No.",
+    dueDateLabel: "Expected Delivery",
+    statuses: ["open", "partial", "completed", "cancelled"],
+    showItems: true,
+    showPartyDetails: true,
+    partyHint: "Select supplier",
+    priceField: "purchase_price",
+    convertTargets: [
+      { label: "Convert to Purchase Bill", target: "purchase_bill", route: RouteName.purchaseBill },
+    ],
+  },
+  purchase_bill: {
+    docType: "purchase_bill",
+    title: "Purchase Bill",
+    addTitle: "Add Purchase Bill",
+    route: RouteName.purchaseBill,
+    addRoute: RouteName.addPurchaseBill,
+    docNoLabel: "Bill No.",
+    dueDateLabel: "Due Date",
+    statuses: ["unpaid", "partial", "paid", "cancelled"],
+    showItems: true,
+    showPartyDetails: true,
+    partyHint: "Select supplier",
+    priceField: "purchase_price",
+    paymentRoute: RouteName.paymentOut,
+    returnRoute: RouteName.purchaseReturn,
+  },
+  payment_out: {
+    docType: "payment_out",
+    title: "Payment Out",
+    addTitle: "Add Payment Out",
+    route: RouteName.paymentOut,
+    addRoute: RouteName.addPaymentOut,
+    docNoLabel: "Payment No.",
+    statuses: ["paid", "cancelled"],
+    showItems: false,
+    showPaymentFields: true,
+    showLinkedInvoice: true,
+    linkedDocType: "purchase_bill",
+    linkedLabel: "Linked Bill",
+    showPartyDetails: true,
+    partyHint: "Select supplier",
+  },
+  purchase_return: {
+    docType: "purchase_return",
+    title: "Purchase Return",
+    addTitle: "Add Purchase Return",
+    route: RouteName.purchaseReturn,
+    addRoute: RouteName.addPurchaseReturn,
+    docNoLabel: "Return No.",
+    statuses: ["draft", "completed", "cancelled"],
+    showItems: true,
+    showReturnReason: true,
+    showLinkedInvoice: true,
+    linkedDocType: "purchase_bill",
+    linkedLabel: "Linked Bill",
+    showPartyDetails: true,
+    partyHint: "Select supplier",
+    priceField: "purchase_price",
   },
 };

@@ -1,11 +1,11 @@
 "use client";
 
-import { salesItems, purchaseItems, cashBankItems, utilitiesItems, backupAndRestoreItems, marketingItems } from "@/constants/menu-data";
+import { salesItems, purchaseItems, cashBankItems, utilitiesItems, marketingItems } from "@/constants/menu-data";
 import { AppAppBar } from "@/components/ui/AppAppBar";
 import { AppTile } from "@/components/ui/AppTile";
 import { AppColors } from "@/constants/colors";
-import { useLayoutContext } from "@/components/layout/LayoutContext";
 import { useRouter } from "next/navigation";
+import { useRouteEnabled } from "@/hooks/use-route-enabled";
 import type { MenuItem } from "@/constants/menu-data";
 
 interface MenuHubScreenProps {
@@ -26,13 +26,14 @@ export function MenuHubScreen({
   showNewOnFirst,
 }: MenuHubScreenProps) {
   const router = useRouter();
-  const { isDashboardShell } = useLayoutContext();
+  const isEnabled = useRouteEnabled();
+  const visibleItems = items.filter((item) => isEnabled(item.href));
 
   return (
     <div className="flex flex-col">
-      <AppAppBar title={title} showNotification showSearch showBack={!isDashboardShell} />
+      <AppAppBar title={title} showNotification showSearch showBack />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4 py-2 min-w-0">
-        {items.map((item, index) => {
+        {visibleItems.map((item, index) => {
           if (tileStyle === "cashBank") {
             return (
               <button
@@ -89,9 +90,5 @@ export function UtilitiesScreen() {
 }
 
 export function MarketingScreen() {
-  return <MenuHubScreen title="Marketing" items={marketingItems} showAdd={false} />;
-}
-
-export function BackupAndRestoreScreen() {
-  return <MenuHubScreen title="Backup & Restore" items={backupAndRestoreItems} showAdd={false} />;
+  return <MenuHubScreen title="Marketing" items={marketingItems} showAdd={false} showArrow />;
 }

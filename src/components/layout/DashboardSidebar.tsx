@@ -11,18 +11,36 @@ import {
   accountNavItems,
   moduleNavItems,
   systemNavItems,
+  allSidebarNavItems,
   type NavItem,
 } from "@/constants/navigation";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { RouteName } from "@/constants/routes";
 import { useSidebarStore } from "@/stores/sidebar-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSessionProfileStore } from "@/stores/session-profile-store";
 import { useResponsive } from "@/hooks/use-responsive";
 import { logoutUser } from "@/services/session-api";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { useLoadingStore } from "@/stores/loading-store";
+import { useRouteEnabled } from "@/hooks/use-route-enabled";
+
+/**
+ * Only the most specific matching item is active, so "Main Menu" (/main-menu) does not
+ * light up together with "Sales" (/main-menu/sales) and every other module.
+ */
+function activeNavHref(pathname: string) {
+  let best = "";
+  for (const { href } of allSidebarNavItems) {
+    const matches =
+      href === RouteName.dashboard ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+    if (matches && href.length > best.length) best = href;
+  }
+  return best;
+}
 
 function isNavActive(pathname: string, href: string) {
-  if (href === RouteName.dashboard) return pathname === RouteName.dashboard;
-  return pathname === href || pathname.startsWith(href + "/");
+  return activeNavHref(pathname) === href;
 }
 
 function NavLink({
@@ -45,8 +63,9 @@ function NavLink({
       href={item.href}
       onClick={onClick}
       title={collapsed ? item.label : undefined}
+      aria-current={active ? "page" : undefined}
       className={clsx(
-        "flex items-center gap-3 px-3 rounded-lg transition-colors text-sm font-medium min-h-[44px]",
+        "flex items-center gap-3 px-3 rounded-lg transition-colors text-sm font-medium min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#588157]",
         isDrawer ? "py-2.5" : "py-2.5",
         active ? "text-white" : "text-[#646464] hover:bg-black/5"
       )}
@@ -93,6 +112,8 @@ function NavSection({
   isDrawer?: boolean;
   onNavigate?: () => void;
 }) {
+  const isEnabled = useRouteEnabled();
+  const visibleItems = items.filter((item) => isEnabled(item.href));
   return (
     <div className="mb-3 last:mb-0 shrink-0">
       {!collapsed && (
@@ -104,7 +125,7 @@ function NavSection({
         </p>
       )}
       <div className="space-y-0.5">
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <NavLink
             key={`${item.href}-${item.label}`}
             item={item}
@@ -130,6 +151,9 @@ export function DashboardSidebar({ onNavigate, isDrawer, onClose }: DashboardSid
   const router = useRouter();
   const { collapsed } = useSidebarStore();
   const logout = useAuthStore((s) => s.logout);
+  const { confirm } = useConfirm();
+  const showLoading = useLoadingStore((s) => s.show);
+  const hideLoading = useLoadingStore((s) => s.hide);
   const user = useSessionProfileStore((s) => s.user);
   const business = useSessionProfileStore((s) => s.business);
   const showCollapsed = isDrawer ? false : collapsed;
@@ -138,17 +162,25 @@ export function DashboardSidebar({ onNavigate, isDrawer, onClose }: DashboardSid
   const avatarSrc = user?.profile_image ?? AppImages.staticUser;
 
   const handleLogout = async () => {
-    if (confirm("Are you sure you want to log out?")) {
-      onNavigate?.();
-      try {
-        await logoutUser();
-      } catch {
-        // Clear local session even if the API call fails.
-      }
-      logout();
-      useSessionProfileStore.getState().clearSessionProfile();
-      router.replace(RouteName.welcome);
+    const ok = await confirm({
+      title: "Log Out",
+      message: "Are you sure you want to log out?",
+      confirmLabel: "Log Out",
+      danger: true,
+    });
+    if (!ok) return;
+    onNavigate?.();
+    showLoading("Logging out...");
+    try {
+      await logoutUser();
+    } catch {
+      // Clear local session even if the API call fails.
+    } finally {
+      hideLoading();
     }
+    logout();
+    useSessionProfileStore.getState().clearSessionProfile();
+    router.replace(RouteName.welcome);
   };
 
   return (
@@ -281,6 +313,9 @@ export function DashboardHeader() {
   const { isWebLayout } = useResponsive();
   const { toggleCollapsed, setMobileOpen } = useSidebarStore();
   const logout = useAuthStore((s) => s.logout);
+  const { confirm } = useConfirm();
+  const showLoading = useLoadingStore((s) => s.show);
+  const hideLoading = useLoadingStore((s) => s.hide);
   const user = useSessionProfileStore((s) => s.user);
   const business = useSessionProfileStore((s) => s.business);
   const accountName = business?.name ?? user?.name ?? "Account";
@@ -307,25 +342,10 @@ export function DashboardHeader() {
         >
           <span className="material-icons text-[#646464]">menu</span>
         </button>
-        <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-[#F0F1F5] min-w-0 flex-1 max-w-xs lg:max-w-sm xl:max-w-md">
-          <AppAsset src={AppImages.search} width={18} height={18} className="shrink-0" />
-          <input
-            type="search"
-            placeholder="Search..."
-            className="bg-transparent text-sm flex-1 min-w-0 outline-none placeholder:text-[#8C8CA1]"
-            style={{ fontFamily: "var(--font-poppins)" }}
-          />
-        </div>
+        <GlobalSearch />
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 shrink-0">
-        <button type="button" className="sm:hidden p-2 rounded-lg hover:bg-gray-100">
-          <AppAsset src={AppImages.search} width={20} height={20} />
-        </button>
-        <button type="button" className="p-2 rounded-lg hover:bg-gray-100 relative">
-          <AppAsset src={AppImages.bell} width={22} height={22} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
-        </button>
         <div
           className="hidden sm:flex items-center gap-2 sm:gap-3 pl-2 border-l"
           style={{ borderColor: AppColors.lightGrey }}
@@ -348,16 +368,24 @@ export function DashboardHeader() {
         <button
           type="button"
           onClick={async () => {
-            if (confirm("Are you sure you want to log out?")) {
-              try {
-                await logoutUser();
-              } catch {
-                // Clear local session even if the API call fails.
-              }
-              logout();
-              useSessionProfileStore.getState().clearSessionProfile();
-              router.replace(RouteName.welcome);
+            const ok = await confirm({
+              title: "Log Out",
+              message: "Are you sure you want to log out?",
+              confirmLabel: "Log Out",
+              danger: true,
+            });
+            if (!ok) return;
+            showLoading("Logging out...");
+            try {
+              await logoutUser();
+            } catch {
+              // Clear local session even if the API call fails.
+            } finally {
+              hideLoading();
             }
+            logout();
+            useSessionProfileStore.getState().clearSessionProfile();
+            router.replace(RouteName.welcome);
           }}
           className="hidden lg:flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
           style={{ color: AppColors.redText }}

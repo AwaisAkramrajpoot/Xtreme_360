@@ -7,7 +7,11 @@ export type SalesDocType =
   | "sales_invoice"
   | "payment_in"
   | "sales_return"
-  | "delivery_note";
+  | "delivery_note"
+  | "purchase_order"
+  | "purchase_bill"
+  | "payment_out"
+  | "purchase_return";
 
 export type SalesDocItem = {
   id?: number;
@@ -100,6 +104,10 @@ const ENDPOINTS: Record<SalesDocType, string> = {
   payment_in: "/payment-ins",
   sales_return: "/sales-returns",
   delivery_note: "/delivery-notes",
+  purchase_order: "/purchase-orders",
+  purchase_bill: "/purchase-bills",
+  payment_out: "/payment-outs",
+  purchase_return: "/purchase-returns",
 };
 
 function toBody(payload: SalesDocPayload) {

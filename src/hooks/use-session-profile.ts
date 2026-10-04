@@ -37,6 +37,12 @@ export function useSessionProfile() {
         logout();
         clearSessionProfile();
         router.replace(RouteName.welcome);
+        return;
+      }
+
+      // Signed in but onboarding was never finished: register the business first.
+      if (useSessionProfileStore.getState().needsBusiness) {
+        router.replace(RouteName.businessRegisteration);
       }
     };
 

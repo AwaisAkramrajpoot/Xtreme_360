@@ -9,6 +9,7 @@ import { AppAsset } from "@/components/ui/AppAsset";
 import { AppImages } from "@/constants/images";
 import { RouteName } from "@/constants/routes";
 import { useAuthStore } from "@/stores/auth-store";
+import { useSessionProfileStore } from "@/stores/session-profile-store";
 import { createBusiness, getCurrentUser } from "@/services/session-api";
 import { getApiErrorMessage } from "@/utils/api-error";
 
@@ -27,6 +28,45 @@ const categories = [
   "Pak wan Center",
   "Motor Parts",
 ];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^\+?[0-9][0-9\s-]{6,19}$/;
+const MAX_LOGO_SIZE = 5 * 1024 * 1024;
+
+type FieldKey =
+  | "businessType"
+  | "category"
+  | "businessName"
+  | "businessEmail"
+  | "businessPhone"
+  | "businessPersonName"
+  | "businessAddress"
+  | "businessDescription"
+  | "businessLogo";
+
+type FieldErrors = Partial<Record<FieldKey, string>>;
+
+function omit(errors: FieldErrors, key: FieldKey): FieldErrors {
+  const next = { ...errors };
+  delete next[key];
+  return next;
+}
+
+/** Same rules as POST /businesses/:id, so problems are caught before submitting. */
+function validateBusiness(values: Record<Exclude<FieldKey, "businessLogo">, string>): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!values.businessType) errors.businessType = "Select a business type";
+  if (!values.category) errors.category = "Select a business category";
+  if (!values.businessName.trim()) errors.businessName = "Business name is required";
+  if (!values.businessEmail.trim()) errors.businessEmail = "Business email is required";
+  else if (!EMAIL_RE.test(values.businessEmail.trim())) errors.businessEmail = "Enter a valid email address";
+  if (!values.businessPhone.trim()) errors.businessPhone = "Mobile number is required";
+  else if (!PHONE_RE.test(values.businessPhone.trim())) errors.businessPhone = "Enter a valid mobile number";
+  if (!values.businessPersonName.trim()) errors.businessPersonName = "Business person name is required";
+  if (!values.businessAddress.trim()) errors.businessAddress = "Business address is required";
+  if (!values.businessDescription.trim()) errors.businessDescription = "Business description is required";
+  return errors;
+}
 
 export function BusinessRegisteration() {
   const router = useRouter();
@@ -47,6 +87,28 @@ export function BusinessRegisteration() {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  /** Wraps a setter so editing a field clears its error. */
+  const bind = (key: FieldKey, setter: (value: string) => void) => (value: string) => {
+    setter(value);
+    if (fieldErrors[key]) {
+      setFieldErrors((e) => omit(e, key));
+    }
+  };
+
+  const onLogoSelected = (file: File | null) => {
+    if (file && !file.type.startsWith("image/")) {
+      setFieldErrors((e) => ({ ...e, businessLogo: "Logo must be an image (PNG, JPG or WEBP)" }));
+      return;
+    }
+    if (file && file.size > MAX_LOGO_SIZE) {
+      setFieldErrors((e) => ({ ...e, businessLogo: "Logo must be 5 MB or smaller" }));
+      return;
+    }
+    setFieldErrors((e) => omit(e, "businessLogo"));
+    setBusinessLogo(file);
+  };
 
   useEffect(() => {
     let active = true;
@@ -82,17 +144,25 @@ export function BusinessRegisteration() {
       setError("Missing user session");
       return;
     }
-    if (
-      !businessType ||
-      !category ||
-      !businessName ||
-      !businessEmail ||
-      !businessPersonName ||
-      !businessPhone ||
-      !businessAddress ||
-      !businessDescription
-    ) {
-      setError("Please fill all required business details");
+    const errors = validateBusiness({
+      businessType,
+      category,
+      businessName,
+      businessEmail,
+      businessPhone,
+      businessPersonName,
+      businessAddress,
+      businessDescription,
+    });
+    if (fieldErrors.businessLogo) errors.businessLogo = fieldErrors.businessLogo;
+    setFieldErrors(errors);
+    const count = Object.keys(errors).length;
+    if (count) {
+      setError(count === 1 ? "Please fix the highlighted field" : `Please fix the ${count} highlighted fields`);
+      // Bring the first problem into view once the error styles have rendered.
+      requestAnimationFrame(() => {
+        document.querySelector('[aria-invalid="true"], [data-invalid="true"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       return;
     }
 
@@ -112,6 +182,8 @@ export function BusinessRegisteration() {
         businessSignature,
         businessLogo,
       });
+      // Drop the cached "no business" profile so the dashboard loads the new business.
+      useSessionProfileStore.getState().clearSessionProfile();
       router.replace(RouteName.dashboard);
     } catch (err) {
       setError(getApiErrorMessage(err, "Unable to register business"));
@@ -158,7 +230,8 @@ export function BusinessRegisteration() {
                     Business Details
                   </h2>
                   <p className="mt-2 text-sm sm:text-base text-[#6B7280]">
-                    Tell us about your business to complete registration.
+                    Tell us about your business to complete registration. Fields marked{" "}
+                    <span className="text-red-500">*</span> are required.
                   </p>
                 </div>
                 <button
@@ -179,15 +252,19 @@ export function BusinessRegisteration() {
                     title="Business type"
                     items={businessTypes}
                     selectedItem={businessType}
-                    onItemSelected={setBusinessType}
+                    onItemSelected={bind("businessType", setBusinessType)}
                     closeOnSelect
+                    required
+                    error={fieldErrors.businessType}
                   />
                   <ExpansionSelectionTile
                     title="Business category"
                     items={categories}
                     selectedItem={category}
-                    onItemSelected={setCategory}
+                    onItemSelected={bind("category", setCategory)}
                     closeOnSelect
+                    required
+                    error={fieldErrors.category}
                   />
                 </div>
 
@@ -196,13 +273,18 @@ export function BusinessRegisteration() {
                     title="Business Name"
                     hintText="Enter your business name"
                     value={businessName}
-                    onChange={setBusinessName}
+                    onChange={bind("businessName", setBusinessName)}
+                    required
+                    error={fieldErrors.businessName}
                   />
                   <AppTextField
                     title="Business Email"
                     hintText="Enter your business email"
                     value={businessEmail}
-                    onChange={setBusinessEmail}
+                    onChange={bind("businessEmail", setBusinessEmail)}
+                    type="email"
+                    required
+                    error={fieldErrors.businessEmail}
                   />
                 </div>
 
@@ -211,13 +293,18 @@ export function BusinessRegisteration() {
                     title="Mobile Number"
                     hintText="Enter your business phone number"
                     value={businessPhone}
-                    onChange={setBusinessPhone}
+                    onChange={bind("businessPhone", setBusinessPhone)}
+                    type="tel"
+                    required
+                    error={fieldErrors.businessPhone}
                   />
                   <AppTextField
                     title="Business Person Name"
                     hintText="Enter business person name"
                     value={businessPersonName}
-                    onChange={setBusinessPersonName}
+                    onChange={bind("businessPersonName", setBusinessPersonName)}
+                    required
+                    error={fieldErrors.businessPersonName}
                   />
                 </div>
 
@@ -225,7 +312,9 @@ export function BusinessRegisteration() {
                   title="Business Address"
                   hintText="Enter your business address"
                   value={businessAddress}
-                  onChange={setBusinessAddress}
+                  onChange={bind("businessAddress", setBusinessAddress)}
+                  required
+                  error={fieldErrors.businessAddress}
                   maxLines={2}
                 />
 
@@ -233,7 +322,9 @@ export function BusinessRegisteration() {
                   title="Business Description"
                   hintText="Enter your business description"
                   value={businessDescription}
-                  onChange={setBusinessDescription}
+                  onChange={bind("businessDescription", setBusinessDescription)}
+                  required
+                  error={fieldErrors.businessDescription}
                   maxLines={2}
                 />
 
@@ -257,12 +348,18 @@ export function BusinessRegisteration() {
                         id={logoInputId}
                         type="file"
                         accept="image/*"
-                        onChange={(e) => setBusinessLogo(e.target.files?.[0] ?? null)}
+                        onChange={(e) => {
+                        onLogoSelected(e.target.files?.[0] ?? null);
+                        e.target.value = "";
+                      }}
                         className="sr-only"
                       />
                       <label
                         htmlFor={logoInputId}
-                        className="flex items-center justify-between gap-4 rounded-2xl border border-dashed border-[#B7C4B2] bg-white px-4 py-4 cursor-pointer hover:border-[#668F5B] hover:bg-[#F7FBF5] transition-colors"
+                        data-invalid={fieldErrors.businessLogo ? true : undefined}
+                        className={`flex items-center justify-between gap-4 rounded-2xl border border-dashed bg-white px-4 py-4 cursor-pointer hover:border-[#668F5B] hover:bg-[#F7FBF5] transition-colors ${
+                          fieldErrors.businessLogo ? "border-red-500" : "border-[#B7C4B2]"
+                        }`}
                       >
                         <span className="flex items-center gap-3 min-w-0">
                           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#668F5B]/10 text-[#668F5B]">
@@ -271,7 +368,7 @@ export function BusinessRegisteration() {
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold text-black">Choose logo file</span>
                             <span className="block text-xs text-[#6B7280] truncate">
-                              {businessLogo ? businessLogo.name : "PNG, JPG or WEBP up to any reasonable size"}
+                              {businessLogo ? businessLogo.name : "Optional · PNG, JPG or WEBP up to 5 MB"}
                             </span>
                           </span>
                         </span>
@@ -279,9 +376,12 @@ export function BusinessRegisteration() {
                           Browse
                         </span>
                       </label>
+                      {fieldErrors.businessLogo && (
+                        <p className="mt-1 text-xs text-red-500">{fieldErrors.businessLogo}</p>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setBusinessLogo(null)}
+                        onClick={() => onLogoSelected(null)}
                         disabled={!businessLogo}
                         className="mt-3 text-sm font-medium text-[#668F5B] disabled:text-[#B7C4B2]"
                       >

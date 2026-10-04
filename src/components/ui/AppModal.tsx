@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { AppColors } from "@/constants/colors";
@@ -14,7 +14,13 @@ interface AppModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   size?: ModalSize;
+  /** Optional Material icon name shown before the title. */
+  titleIcon?: string;
 }
+
+// Open modals, innermost last, so a modal opened from inside another one
+// (e.g. Add Unit over Add Item) is the only one that reacts to Escape.
+const openModalStack: symbol[] = [];
 
 const sizeClasses: Record<ModalSize, string> = {
   sm: "max-w-md",
@@ -30,28 +36,40 @@ export function AppModal({
   children,
   footer,
   size = "lg",
+  titleIcon,
 }: AppModalProps) {
+  const [modalId] = useState(() => Symbol("modal"));
+  const titleId = useId();
+
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape" || openModalStack[openModalStack.length - 1] !== modalId) return;
+      onClose();
     },
-    [onClose]
+    [onClose, modalId]
   );
 
   useEffect(() => {
     if (!open) return;
-    document.addEventListener("keydown", handleEscape);
+    openModalStack.push(modalId);
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "";
+      const index = openModalStack.lastIndexOf(modalId);
+      if (index !== -1) openModalStack.splice(index, 1);
+      if (openModalStack.length === 0) document.body.style.overflow = "";
     };
+  }, [open, modalId]);
+
+  useEffect(() => {
+    if (!open) return;
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, [open, handleEscape]);
 
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 sm:p-6">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-200"
         onClick={onClose}
@@ -60,7 +78,7 @@ export function AppModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
         className={clsx(
           "relative w-full flex flex-col max-h-[90vh] bg-white rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200",
           sizeClasses[size]
@@ -72,10 +90,15 @@ export function AppModal({
           style={{ borderColor: AppColors.lightGrey }}
         >
           <h2
-            id="modal-title"
-            className="text-xl font-bold text-black"
+            id={titleId}
+            className="flex items-center gap-2 text-xl font-bold text-black"
             style={{ fontFamily: "var(--font-poppins)" }}
           >
+            {titleIcon && (
+              <span className="material-icons text-[22px]" style={{ color: AppColors.primary }} aria-hidden>
+                {titleIcon}
+              </span>
+            )}
             {title}
           </h2>
           <button

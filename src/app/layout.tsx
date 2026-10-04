@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { AuthHydrationGate } from "@/components/providers/AuthHydrationGate";
+import { AppProviders } from "@/components/providers/AppProviders";
 
 export const metadata: Metadata = {
   title: "Xtreme 360",
@@ -22,14 +22,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
-      <head>
-        <link
-          href="https://fonts.googleapis.com/icon?family=Material+Icons"
-          rel="stylesheet"
-        />
-      </head>
       <body className="min-h-full flex flex-col bg-white" suppressHydrationWarning>
-        <AuthHydrationGate>{children}</AuthHydrationGate>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AppColors } from "@/constants/colors";
 import { AppAsset } from "./AppAsset";
 import { AppImages } from "@/constants/images";
 import { useLayoutContext } from "@/components/layout/LayoutContext";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useSessionProfileStore } from "@/stores/session-profile-store";
+import { getParentRoute, shouldShowBack } from "@/constants/route-hierarchy";
 
 interface AppAppBarProps {
   title: string;
@@ -15,6 +16,7 @@ interface AppAppBarProps {
   showAvatar?: boolean;
   showSearch?: boolean;
   showBack?: boolean;
+  backHref?: string;
   actions?: React.ReactNode;
   subtitle?: string;
   searchValue?: string;
@@ -28,6 +30,7 @@ export function AppAppBar({
   showAvatar,
   showSearch,
   showBack,
+  backHref,
   actions,
   subtitle,
   searchValue,
@@ -35,6 +38,7 @@ export function AppAppBar({
   searchPlaceholder = "Search",
 }: AppAppBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isDashboardShell } = useLayoutContext();
   const user = useSessionProfileStore((s) => s.user);
   const avatarSrc = user?.profile_image ?? AppImages.staticUser;
@@ -42,7 +46,13 @@ export function AppAppBar({
   const [internalSearch, setInternalSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const resolvedSearch = searchValue ?? internalSearch;
-  const resolvedShowBack = showBack ?? true;
+  const parent = backHref || getParentRoute(pathname || "");
+  const resolvedShowBack = showBack ?? shouldShowBack(pathname || "");
+
+  const handleBack = () => {
+    if (parent) router.push(parent);
+    else router.back();
+  };
 
   useEffect(() => {
     if (searchOpen) {
@@ -65,6 +75,7 @@ export function AppAppBar({
         showAvatar={showAvatar}
         showSearch={showSearch}
         showBack={resolvedShowBack}
+        backHref={parent || undefined}
         actions={actions}
         subtitle={subtitle}
         searchValue={resolvedSearch}
@@ -81,7 +92,7 @@ export function AppAppBar({
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
         {resolvedShowBack && (
-          <button type="button" onClick={() => router.back()} className="p-1 -ml-1">
+          <button type="button" onClick={handleBack} className="p-1 -ml-1" aria-label="Back">
             <span className="material-icons text-black">arrow_back</span>
           </button>
         )}
@@ -100,7 +111,10 @@ export function AppAppBar({
         {showSearch && (
           <div className="ml-3 flex items-center">
             {searchOpen ? (
-              <div className="flex h-10 items-center rounded-full border bg-white px-3" style={{ borderColor: AppColors.lightGrey }}>
+              <div
+                className="flex h-10 items-center rounded-full border bg-white px-3"
+                style={{ borderColor: AppColors.lightGrey }}
+              >
                 <span className="material-icons text-sm" style={{ color: AppColors.grey }}>
                   search
                 </span>

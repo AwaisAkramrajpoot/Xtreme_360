@@ -31,7 +31,7 @@ export const moduleNavItems: NavItem[] = [
   { label: "Employee", href: RouteName.employee, icon: AppImages.employee, section: "modules" },
   { label: "Other Income", href: RouteName.otherIncome, icon: AppImages.otherIncome, section: "modules" },
   { label: "Calendar", href: RouteName.calendar, icon: AppImages.calendar, section: "modules" },
-  { label: "POS", href: RouteName.posList, icon: AppImages.item, section: "modules" },
+  { label: "POS", href: RouteName.pos, icon: AppImages.item, section: "modules" },
 ];
 
 export const systemNavItems: NavItem[] = [

@@ -18,6 +18,8 @@ interface SessionProfileState {
   loading: boolean;
   error: string | null;
   loadedToken: string | null;
+  /** True when the API confirmed (404) that this account has no business yet. */
+  needsBusiness: boolean;
   loadSessionProfile: (force?: boolean) => Promise<SessionLoadResult>;
   updateProfileImage: (file: File) => Promise<UserProfile>;
   clearSessionProfile: () => void;
@@ -33,6 +35,7 @@ export const useSessionProfileStore = create<SessionProfileState>((set, get) => 
   loading: false,
   error: null,
   loadedToken: null,
+  needsBusiness: false,
   loadSessionProfile: async (force = false) => {
     const token = useAuthStore.getState().token;
 
@@ -75,9 +78,12 @@ export const useSessionProfileStore = create<SessionProfileState>((set, get) => 
 
       const user = userResult.value;
       let business: BusinessRecord | null = null;
+      let businessMissing = false;
 
       if (businessResult.status === "fulfilled") {
         business = businessResult.value;
+      } else if (getStatusCode(businessResult.reason) === 404) {
+        businessMissing = true;
       } else if (getStatusCode(businessResult.reason) === 401) {
         set({
           user: null,
@@ -99,6 +105,7 @@ export const useSessionProfileStore = create<SessionProfileState>((set, get) => 
         loading: false,
         error: null,
         loadedToken: token,
+        needsBusiness: businessMissing && !business,
       });
       return "ready";
     } catch {
@@ -127,5 +134,6 @@ export const useSessionProfileStore = create<SessionProfileState>((set, get) => 
       loading: false,
       error: null,
       loadedToken: null,
+      needsBusiness: false,
     }),
 }));

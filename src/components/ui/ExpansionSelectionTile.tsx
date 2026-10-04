@@ -11,6 +11,10 @@ interface ExpansionSelectionTileProps {
   onItemSelected?: (item: string) => void;
   closeOnSelect?: boolean;
   defaultExpanded?: boolean;
+  /** Shows a red asterisk after the title. */
+  required?: boolean;
+  /** Error message shown under the tile, with a red outline. */
+  error?: string;
 }
 
 export function ExpansionSelectionTile({
@@ -21,24 +25,33 @@ export function ExpansionSelectionTile({
   onItemSelected,
   closeOnSelect = false,
   defaultExpanded = false,
+  required,
+  error,
 }: ExpansionSelectionTileProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [selectedItem, setSelectedItem] = useState(externalSelected ?? "");
 
   return (
-    <div className="relative">
+    <div className="relative" data-invalid={error ? true : undefined}>
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
         className="relative z-20 w-full px-4 py-3 flex items-center justify-between"
         style={{
           backgroundColor: AppColors.primary,
           borderRadius: isExpanded ? "8px 8px 0 0" : "8px",
+          boxShadow: error ? "0 0 0 2px #EF4444" : undefined,
         }}
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-base font-semibold text-white" style={{ fontFamily: "var(--font-poppins)" }}>
             {title}
+            {required && (
+              <span className="ml-0.5 text-[#FFD2D2]" aria-hidden>
+                *
+              </span>
+            )}
           </span>
           {selectedItem && closeOnSelect && (
             <span className="px-2 py-1 text-xs font-medium text-black bg-white rounded truncate">
@@ -89,6 +102,7 @@ export function ExpansionSelectionTile({
           </div>
         </div>
       )}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 }

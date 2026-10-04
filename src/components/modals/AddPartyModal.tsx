@@ -9,6 +9,7 @@ import { FormButtonsRow } from "@/components/ui/FormButtonsRow";
 import { AppColors } from "@/constants/colors";
 import { createParty, updateParty, type PartyRecord } from "@/services/party-api";
 import { getApiErrorMessage } from "@/utils/api-error";
+import { useSettingsStore } from "@/stores/settings-store";
 
 const PARTY_TYPES = ["Supplier", "Customer", "Both"] as const;
 const PARTY_CATEGORIES = ["Category 1", "Category 2", "Category 3"] as const;
@@ -69,6 +70,8 @@ const emptyForm = {
   cncNumber: "",
   address: "",
   emergencyNumber: "",
+  tinNumber: "",
+  shippingAddress: "",
 };
 
 export function AddPartyModal({ open, onClose, onSuccess, initialData = null }: AddPartyModalProps) {
@@ -91,6 +94,7 @@ export function AddPartyModal({ open, onClose, onSuccess, initialData = null }: 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const partySettings = useSettingsStore((s) => s.app.party);
 
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -144,6 +148,8 @@ export function AddPartyModal({ open, onClose, onSuccess, initialData = null }: 
         cncNumber: initialData.cnc_number || "",
         address: initialData.address || "",
         emergencyNumber: initialData.emergency_number || "",
+        tinNumber: initialData.tin_number || "",
+        shippingAddress: initialData.shipping_address || "",
       });
       setIsActive(initialData.is_active !== false);
       setPartyType(initialData.party_type || null);
@@ -200,7 +206,8 @@ export function AddPartyModal({ open, onClose, onSuccess, initialData = null }: 
       openingDate: form.openingDate,
       isActive,
       partyType,
-      partyCategory,
+      // Hidden fields are not sent, so existing values on the party are kept.
+      partyCategory: partySettings.partyGrouping ? partyCategory : undefined,
       openingBalance: form.openingBalance,
       mobileNumber: form.mobileNumber,
       country,
@@ -210,6 +217,8 @@ export function AddPartyModal({ open, onClose, onSuccess, initialData = null }: 
       cncNumber: form.cncNumber,
       address: form.address,
       emergencyNumber: form.emergencyNumber,
+      tinNumber: partySettings.tinNumber ? form.tinNumber : undefined,
+      shippingAddress: partySettings.partyShippingAddress ? form.shippingAddress : undefined,
       cncFrontPicture,
       cncBackPicture,
     };
@@ -257,6 +266,7 @@ export function AddPartyModal({ open, onClose, onSuccess, initialData = null }: 
           </div>
         </div>
         <AppDropDown title="Party type" items={[...PARTY_TYPES]} value={partyType} onChange={setPartyType} hintText="Select type" />
+        {partySettings.partyGrouping && (
         <div>
           <div className="flex items-end gap-2">
             <div className="flex-1">
@@ -322,6 +332,7 @@ export function AddPartyModal({ open, onClose, onSuccess, initialData = null }: 
             </div>
           )}
         </div>
+        )}
         <AppTextField title="Party Name" hintText="Enter Party name" value={form.partyName} onChange={set("partyName")} error={errors.partyName} />
         <AppTextField title="Opening balance" hintText="Enter Opening Balance" value={form.openingBalance} onChange={set("openingBalance")} type="number" />
         <AppTextField title="Mobile Number" hintText="+92 345 3648374" value={form.mobileNumber} onChange={set("mobileNumber")} />
@@ -334,11 +345,17 @@ export function AddPartyModal({ open, onClose, onSuccess, initialData = null }: 
           <AppDropDown title="Zone" items={[...ZONES]} value={zone} onChange={setZone} hintText="Select Zone" />
         </div>
         <AppTextField title="CNC Number" hintText="00000-0000000-0" value={form.cncNumber} onChange={set("cncNumber")} />
+        {partySettings.tinNumber && (
+          <AppTextField title="NTN Number" hintText="Enter National Tax Number" value={form.tinNumber} onChange={set("tinNumber")} />
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ImageUploadBox label="CNC Front Picture" file={cncFrontPicture} onSelect={setCncFrontPicture} />
           <ImageUploadBox label="CNC Back Picture" file={cncBackPicture} onSelect={setCncBackPicture} />
         </div>
         <AppTextField title="Address" hintText="Enter complete Address" value={form.address} onChange={set("address")} maxLines={3} />
+        {partySettings.partyShippingAddress && (
+          <AppTextField title="Shipping Address" hintText="Leave empty if same as address" value={form.shippingAddress} onChange={set("shippingAddress")} maxLines={3} />
+        )}
         <AppTextField title="Emergency Number" hintText="1234-1234567-1" value={form.emergencyNumber} onChange={set("emergencyNumber")} />
       </div>
     </AppModal>

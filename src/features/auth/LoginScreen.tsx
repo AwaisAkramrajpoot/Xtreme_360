@@ -10,7 +10,8 @@ import { RouteName } from "@/constants/routes";
 import { isValidEmail } from "@/utils/helpers";
 import { useAuthStore } from "@/stores/auth-store";
 import { loginUser } from "@/services/session-api";
-import { getApiErrorMessage } from "@/utils/api-error";
+import { getApiErrorCode, getApiErrorMessage } from "@/utils/api-error";
+import { AccountStatusNotice } from "./AccountStatusNotice";
 
 export function LoginScreen() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [submitError, setSubmitError] = useState("");
+  const [accountNotice, setAccountNotice] = useState<{ status: "pending" | "rejected"; message: string } | null>(null);
 
   const validate = () => {
     const next: typeof errors = {};
@@ -34,12 +36,19 @@ export function LoginScreen() {
     if (!validate()) return;
     setLoading(true);
     setSubmitError("");
+    setAccountNotice(null);
     try {
       const { accessToken } = await loginUser({ email, password });
       setToken(accessToken);
+      // The dashboard sends accounts without a business to business registration.
       router.replace(RouteName.dashboard);
     } catch (error) {
       const message = getApiErrorMessage(error, "Unable to log in");
+      const code = getApiErrorCode(error);
+      if (code === "pending_approval" || code === "account_rejected") {
+        setAccountNotice({ status: code === "pending_approval" ? "pending" : "rejected", message });
+        return;
+      }
       if (message.toLowerCase().includes("not verified")) {
         router.replace(`${RouteName.verifyOtp}?email=${encodeURIComponent(email)}&flow=signup`);
         return;
@@ -90,6 +99,7 @@ export function LoginScreen() {
             Forgot password?
           </button>
         </div>
+        {accountNotice && <AccountStatusNotice status={accountNotice.status} message={accountNotice.message} />}
         {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         <AppButton text="Login" isLoading={loading} type="submit" />
         <div className="flex items-center gap-4">

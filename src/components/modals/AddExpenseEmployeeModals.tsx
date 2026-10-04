@@ -10,8 +10,11 @@ import {
   updateExpense,
   getExpenseCategories,
   createExpenseCategory,
+  getNextExpenseNo,
+  EXPENSE_PAYMENT_MODES,
   type ExpenseRecord,
 } from "@/services/expense-api";
+import { getAccounts } from "@/services/cash-bank-api";
 import { getApiErrorMessage } from "@/utils/api-error";
 import { AppColors } from "@/constants/colors";
 import { createEmployee, updateEmployee, type EmployeeRecord } from "@/services/employee-api";
@@ -34,14 +37,17 @@ export function AddExpenseModal({
   const isEdit = Boolean(initialData?.id);
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<{ amount?: string; bankAccount?: string }>({});
 
   /* category state */
   const [apiCategories, setApiCategories] = useState<string[]>([]);
   const [category, setCategory] = useState<string | null>(null);
   const [addingCategory, setAddingCategory] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
-  const [addCatLoading, setAddCatLoading] = useState(false);
-  const [addCatError, setAddCatError] = useState("");
+
+  /* payment: Cash, or Bank / Cheque / Online from a bank account (same as Other Income) */
+  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [bankAccount, setBankAccount] = useState("");
+  const [bankAccounts, setBankAccounts] = useState<string[]>([]);
 
   const allCategories = [
     ...apiCategories,
@@ -58,7 +64,7 @@ export function AddExpenseModal({
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  /* load categories whenever modal opens */
+  /* load categories and bank accounts whenever modal opens */
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -70,12 +76,19 @@ export function AddExpenseModal({
         /* keep fallback list */
       }
     })();
+    getAccounts("bank")
+      .then((rows) => {
+        if (!cancelled) setBankAccounts(rows.map((a) => a.account_name));
+      })
+      .catch(() => undefined);
     return () => { cancelled = true; };
   }, [open]);
 
-  /* pre-fill form on edit */
+  /* pre-fill form on edit; new expenses get today's date and the next number */
   useEffect(() => {
     if (!open) return;
+    setSubmitError(null);
+    setErrors({});
     if (initialData) {
       setForm({
         expenseNo: initialData.expense_no || "",
@@ -84,42 +97,44 @@ export function AddExpenseModal({
         notes: initialData.notes || "",
       });
       setCategory(initialData.category || null);
-      setSubmitError(null);
+      setPaymentMode(initialData.payment_mode || "Cash");
+      setBankAccount(initialData.bank_account || "");
       return;
     }
-    setForm({ expenseNo: "", date: "", totalAmount: "", notes: "" });
+    setForm({ expenseNo: "", date: new Date().toLocaleDateString("en-CA"), totalAmount: "", notes: "" });
     setCategory(null);
-    setSubmitError(null);
+    setPaymentMode("Cash");
+    setBankAccount("");
+    let cancelled = false;
+    getNextExpenseNo()
+      .then((no) => {
+        if (!cancelled) setForm((f) => ({ ...f, expenseNo: no }));
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
   }, [open, initialData]);
 
-  const handleAddCategory = async () => {
-    if (!newCatName.trim()) { setAddCatError("Enter a category name"); return; }
-    setAddCatLoading(true);
-    setAddCatError("");
-    try {
-      await createExpenseCategory(newCatName.trim());
-      const rows = await getExpenseCategories();
-      setApiCategories(rows.map((r) => r.name));
-      setCategory(newCatName.trim());
-      setNewCatName("");
-      setAddingCategory(false);
-    } catch (err) {
-      setAddCatError(getApiErrorMessage(err, "Failed to add category"));
-    } finally {
-      setAddCatLoading(false);
-    }
-  };
-
   const handleSave = async () => {
+    const next: typeof errors = {};
+    if (!(Number(form.totalAmount) > 0)) next.amount = "Enter an amount greater than 0";
+    if (paymentMode !== "Cash" && bankAccounts.length && !bankAccount) {
+      next.bankAccount = "Select the account it was paid from";
+    }
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
     setLoading(true);
     setSubmitError(null);
     try {
       const payload = {
-        expenseNo: form.expenseNo,
+        // New expenses are numbered by the server so two open forms can't take the same number.
+        expenseNo: isEdit ? form.expenseNo : undefined,
         date: form.date,
         category: category || undefined,
         totalAmount: form.totalAmount,
         notes: form.notes,
+        paymentMode,
+        bankAccount: paymentMode === "Cash" ? "" : bankAccount,
       };
       if (isEdit && initialData?.id) {
         await updateExpense(initialData.id, payload);
@@ -153,72 +168,117 @@ export function AddExpenseModal({
       <div className="space-y-4">
         {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <AppTextField title="Expense No" hintText="e.g. 001" value={form.expenseNo} onChange={set("expenseNo")} />
-          <AppTextField title="Date" hintText="dd/mm/yyyy" value={form.date} onChange={set("date")} isDateField />
+          <AppTextField title="Date" hintText="yyyy-mm-dd" value={form.date} onChange={set("date")} isDateField />
+          <AppTextField
+            title="Expense No."
+            hintText="Auto"
+            value={form.expenseNo || (isEdit ? "" : "…")}
+            onChange={() => undefined}
+            readOnly
+          />
         </div>
 
-        {/* Category row with inline add */}
-        <div>
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
+        <AppDropDown
+          title="Expense Category"
+          items={allCategories}
+          value={category}
+          onChange={setCategory}
+          hintText="Select category"
+          actionLabel="Add New Category"
+          onAction={() => setAddingCategory(true)}
+        />
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <AppTextField
+            title="Total Amount"
+            hintText="0.00"
+            value={form.totalAmount}
+            onChange={set("totalAmount")}
+            type="number"
+            error={errors.amount}
+          />
+          <AppDropDown
+            title="Paid From"
+            items={EXPENSE_PAYMENT_MODES}
+            value={paymentMode}
+            onChange={setPaymentMode}
+          />
+        </div>
+        {paymentMode !== "Cash" &&
+          (bankAccounts.length ? (
+            <div>
               <AppDropDown
-                title="Expense Category"
-                items={allCategories}
-                value={category}
-                onChange={setCategory}
-                hintText="Select category"
+                title="Bank Account *"
+                items={bankAccounts}
+                value={bankAccount || null}
+                onChange={setBankAccount}
+                hintText="Select bank account"
               />
+              {errors.bankAccount && <p className="mt-1 text-xs text-red-500">{errors.bankAccount}</p>}
             </div>
-            <button
-              type="button"
-              title="Add new category"
-              onClick={() => { setAddingCategory((v) => !v); setAddCatError(""); }}
-              className="mb-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-lg transition-colors"
-              style={{
-                backgroundColor: addingCategory ? AppColors.primary : AppColors.inputFill,
-                color: addingCategory ? "#fff" : AppColors.primary,
-              }}
-            >
-              <span className="material-icons" style={{ fontSize: 22 }}>
-                {addingCategory ? "close" : "add"}
-              </span>
-            </button>
-          </div>
-
-          {addingCategory && (
-            <div className="mt-2 flex items-end gap-2 rounded-xl border p-3" style={{ borderColor: AppColors.lightGrey, backgroundColor: "#F7F8FB" }}>
-              <div className="flex-1">
-                <AppTextField
-                  title="New Category Name"
-                  hintText="e.g. Rent"
-                  value={newCatName}
-                  onChange={setNewCatName}
-                  error={addCatError}
-                />
-              </div>
-              <button
-                type="button"
-                disabled={addCatLoading}
-                onClick={() => void handleAddCategory()}
-                className="mb-0.5 flex h-12 items-center gap-1.5 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-60"
-                style={{ backgroundColor: AppColors.primary }}
-              >
-                {addCatLoading ? (
-                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <>
-                    <span className="material-icons" style={{ fontSize: 16 }}>check</span>
-                    Save
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
-
-        <AppTextField title="Total Amount" hintText="0.00" value={form.totalAmount} onChange={set("totalAmount")} type="number" />
+          ) : (
+            <p className="rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: "#FFF8E6", color: "#8A6200" }}>
+              No bank accounts yet — add one in Cash &amp; Bank to track where this was paid from.
+            </p>
+          ))}
         <AppTextField title="Notes" hintText="Enter notes" value={form.notes} onChange={set("notes")} maxLines={2} />
       </div>
+
+      <AddExpenseCategoryModal
+        open={addingCategory}
+        onClose={() => setAddingCategory(false)}
+        onCreated={(name) => {
+          setApiCategories((current) => (current.includes(name) ? current : [name, ...current]));
+          setCategory(name);
+        }}
+      />
+    </AppModal>
+  );
+}
+
+/** "Add New Category" from the expense category dropdown. */
+function AddExpenseCategoryModal({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (name: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Enter a category name");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await createExpenseCategory(trimmed);
+      onCreated(trimmed);
+      setName("");
+      onClose();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to add category"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="Add Expense Category"
+      size="sm"
+      footer={<FormButtonsRow onCancel={onClose} onSave={() => void save()} isLoading={saving} />}
+    >
+      <AppTextField title="Category Name" hintText="e.g. Rent" value={name} onChange={setName} error={error} />
     </AppModal>
   );
 }

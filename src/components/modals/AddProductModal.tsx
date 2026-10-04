@@ -4,26 +4,30 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { AppModal } from "@/components/ui/AppModal";
 import { AppTextField } from "@/components/ui/AppTextField";
-import { AppDropDown } from "@/components/ui/AppDropDown";
 import { FormButtonsRow } from "@/components/ui/FormButtonsRow";
 import { AppColors } from "@/constants/colors";
-import { createItem, getItemCategories } from "@/services/item-api";
-import { getUnits } from "@/services/unit-api";
+import { CategorySelectField, UnitSelectField } from "@/components/modals/LookupSelectFields";
+import { createItem, type ItemRecord } from "@/services/item-api";
 import { getApiErrorMessage } from "@/utils/api-error";
+import { useSettingsStore } from "@/stores/settings-store";
 
 interface AddProductModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  /** Receives the saved item, e.g. to pick it in the form that opened this modal. */
+  onCreated?: (item: ItemRecord) => void;
 }
 
-export function AddProductModal({ open, onClose, onSuccess }: AddProductModalProps) {
+export function AddProductModal({ open, onClose, onSuccess, onCreated }: AddProductModalProps) {
+  const itemSettings = useSettingsStore((s) => s.itemSettings);
+  const loadSettings = useSettingsStore((s) => s.loadSettings);
+  const loaded = useSettingsStore((s) => s.loaded);
+
   const [activeTab, setActiveTab] = useState<"pricing" | "stock">("pricing");
   const [loading, setLoading] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
   const [unit, setUnit] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [units, setUnits] = useState<string[]>([]);
   const [itemImage, setItemImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -39,6 +43,19 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
     atPrice: "",
     minStockQty: "",
     itemLocation: "",
+    taxPercent: "",
+    discountRs: "",
+    discountPercent: "",
+    brand: "",
+    serialNumber: "",
+    modelNumber: "",
+    warranty: "",
+    manufacturingDate: "",
+    expiryDate: "",
+    batch: "",
+    weight: "",
+    color: "",
+    size: "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,24 +66,8 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
     Array.from({ length: 16 }, () => Math.floor(Math.random() * 10)).join("");
 
   useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const [categoryRows, unitRows] = await Promise.all([getItemCategories(), getUnits()]);
-        if (cancelled) return;
-        setCategories(categoryRows.map((c) => c.name).filter(Boolean));
-        setUnits(unitRows.map((u) => u.name || u.abbreviation).filter(Boolean));
-      } catch {
-        // Keep modal usable even if lookups fail
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
+    if (!loaded) loadSettings().catch(() => undefined);
+  }, [loaded, loadSettings]);
 
   useEffect(() => {
     if (!open) {
@@ -77,12 +78,10 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
   }, [open, imagePreview]);
 
   const resetForm = () => {
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-    }
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setForm({
       itemName: "",
-      itemCode: generateBarcode(),
+      itemCode: itemSettings.barcodeScanning ? generateBarcode() : "",
       description: "",
       salePrice: "",
       purchasePrice: "",
@@ -92,6 +91,19 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
       atPrice: "",
       minStockQty: "",
       itemLocation: "",
+      taxPercent: "",
+      discountRs: "",
+      discountPercent: "",
+      brand: "",
+      serialNumber: "",
+      modelNumber: "",
+      warranty: "",
+      manufacturingDate: "",
+      expiryDate: "",
+      batch: "",
+      weight: "",
+      color: "",
+      size: "",
     });
     setCategory(null);
     setUnit(null);
@@ -102,23 +114,22 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
   };
 
   useEffect(() => {
-    if (open && !form.itemCode) {
+    if (open && itemSettings.barcodeScanning && !form.itemCode) {
       setForm((current) => ({
         ...current,
         itemCode: generateBarcode(),
       }));
     }
-  }, [open, form.itemCode]);
+  }, [open, form.itemCode, itemSettings.barcodeScanning]);
 
   const handleImageChange = (file: File | null) => {
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-    }
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setItemImage(file);
     setImagePreview(file ? URL.createObjectURL(file) : null);
   };
 
   const ensureBarcode = () => {
+    if (!itemSettings.barcodeScanning) return form.itemCode.trim() || undefined;
     const existing = form.itemCode.trim();
     return existing.length === 16 && /^\d{16}$/.test(existing) ? existing : generateBarcode();
   };
@@ -131,24 +142,38 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
     setLoading(true);
     setSubmitError(null);
     try {
-      await createItem({
+      const created = await createItem({
         itemName: form.itemName,
         itemType: "product",
         itemCode: ensureBarcode(),
-        itemUnit: unit && unit !== "No units yet" ? unit : null,
-        itemCategory: category && category !== "No categories yet" ? category : null,
-        description: form.description,
+        itemUnit: itemSettings.itemUnit ? unit : null,
+        itemCategory: itemSettings.itemCategory ? category : null,
+        description: itemSettings.description ? form.description : undefined,
         salePrice: form.salePrice,
         purchasePrice: form.purchasePrice,
-        wholesalePrice: form.wholesalePrice,
-        openingStock: form.openingStock,
-        asOfDate: form.asOfDate,
-        atPrice: form.atPrice,
-        minStockQty: form.minStockQty,
-        itemLocation: form.itemLocation,
+        wholesalePrice: itemSettings.wholesalePrice ? form.wholesalePrice : undefined,
+        openingStock: itemSettings.stockMaintenance ? form.openingStock : undefined,
+        asOfDate: itemSettings.stockMaintenance ? form.asOfDate : undefined,
+        atPrice: itemSettings.stockMaintenance ? form.atPrice : undefined,
+        minStockQty: itemSettings.stockMaintenance ? form.minStockQty : undefined,
+        itemLocation: itemSettings.stockMaintenance ? form.itemLocation : undefined,
+        taxPercent: itemSettings.itemWiseTax ? form.taxPercent : undefined,
+        discountRs: itemSettings.itemWiseDiscountRs ? form.discountRs : undefined,
+        discountPercent: itemSettings.itemWiseDiscountPercent ? form.discountPercent : undefined,
+        brand: itemSettings.brand ? form.brand : undefined,
+        serialNumber: itemSettings.serialNumber ? form.serialNumber : undefined,
+        modelNumber: itemSettings.modelNumber ? form.modelNumber : undefined,
+        warranty: itemSettings.warranty ? form.warranty : undefined,
+        manufacturingDate: itemSettings.manufacturingDate ? form.manufacturingDate : undefined,
+        expiryDate: itemSettings.expiryDate ? form.expiryDate : undefined,
+        batch: itemSettings.batch ? form.batch : undefined,
+        weight: itemSettings.weight ? form.weight : undefined,
+        color: itemSettings.color ? form.color : undefined,
+        size: itemSettings.size ? form.size : undefined,
         itemImage,
       });
       resetForm();
+      if (created?.id) onCreated?.(created);
       onSuccess?.();
       onClose();
     } catch (error) {
@@ -175,6 +200,8 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
     </button>
   );
 
+  const showStockTab = itemSettings.stockMaintenance;
+
   return (
     <AppModal
       open={open}
@@ -186,38 +213,108 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
       <div className="space-y-4">
         {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         <AppTextField title="Item Name" hintText="Add Item Name" value={form.itemName} onChange={set("itemName")} />
-        <AppDropDown
-          title="Item Unit"
-          items={units.length ? units : ["No units yet"]}
-          value={unit}
-          onChange={setUnit}
-          hintText="Select Unit"
-        />
-        <AppTextField
-          title="Item Code / Barcode"
-          hintText="Auto-generated if empty"
-          value={form.itemCode}
-          onChange={set("itemCode")}
-          maxLength={16}
-          suffix={
-            <button
-              type="button"
-              onClick={() => setForm((current) => ({ ...current, itemCode: generateBarcode() }))}
-              className="text-xs font-semibold"
-              style={{ color: AppColors.primary }}
-            >
-              Auto
-            </button>
-          }
-        />
-        <AppDropDown
-          title="Item Category"
-          items={categories.length ? categories : ["No categories yet"]}
-          value={category}
-          onChange={setCategory}
-          hintText="Item Category"
-        />
-        <AppTextField title="Description" hintText="Item description" value={form.description} onChange={set("description")} maxLines={3} />
+
+        {itemSettings.itemUnit && (
+          <UnitSelectField title="Item Unit" hintText="Select Unit" value={unit} onChange={setUnit} />
+        )}
+
+        {itemSettings.barcodeScanning && (
+          <AppTextField
+            title="Item Code / Barcode"
+            hintText="Auto-generated if empty"
+            value={form.itemCode}
+            onChange={set("itemCode")}
+            maxLength={16}
+            suffix={
+              <button
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, itemCode: generateBarcode() }))}
+                className="text-xs font-semibold"
+                style={{ color: AppColors.primary }}
+              >
+                Auto
+              </button>
+            }
+          />
+        )}
+
+        {itemSettings.itemCategory && (
+          <CategorySelectField
+            title="Item Category"
+            hintText="Item Category"
+            value={category}
+            onChange={setCategory}
+          />
+        )}
+
+        {itemSettings.description && (
+          <AppTextField
+            title="Description"
+            hintText="Item description"
+            value={form.description}
+            onChange={set("description")}
+            maxLines={3}
+          />
+        )}
+
+        {itemSettings.brand && (
+          <AppTextField title="Brand" hintText="Brand" value={form.brand} onChange={set("brand")} />
+        )}
+        {itemSettings.serialNumber && (
+          <AppTextField
+            title="Serial Number"
+            hintText="Serial Number"
+            value={form.serialNumber}
+            onChange={set("serialNumber")}
+          />
+        )}
+        {itemSettings.modelNumber && (
+          <AppTextField
+            title="Model Number"
+            hintText="Model Number"
+            value={form.modelNumber}
+            onChange={set("modelNumber")}
+          />
+        )}
+        {itemSettings.warranty && (
+          <AppTextField
+            title="Warranty"
+            hintText="e.g. 1 Year"
+            value={form.warranty}
+            onChange={set("warranty")}
+          />
+        )}
+        {itemSettings.manufacturingDate && (
+          <AppTextField
+            title="Manufacturing Date"
+            hintText="dd/mm/yyyy"
+            value={form.manufacturingDate}
+            onChange={set("manufacturingDate")}
+            isDateField
+          />
+        )}
+        {itemSettings.expiryDate && (
+          <AppTextField
+            title="Expiry Date"
+            hintText="dd/mm/yyyy"
+            value={form.expiryDate}
+            onChange={set("expiryDate")}
+            isDateField
+          />
+        )}
+        {itemSettings.batch && (
+          <AppTextField title="Batch" hintText="Batch" value={form.batch} onChange={set("batch")} />
+        )}
+        {itemSettings.weight && (
+          <AppTextField title="Weight" hintText="Weight" value={form.weight} onChange={set("weight")} />
+        )}
+        {itemSettings.color && (
+          <AppTextField title="Color" hintText="Color" value={form.color} onChange={set("color")} />
+        )}
+        {itemSettings.size && (
+          <AppTextField title="Size" hintText="Size" value={form.size} onChange={set("size")} />
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
@@ -229,10 +326,7 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
           type="button"
           onClick={() => fileInputRef.current?.click()}
           className="w-full overflow-hidden rounded-2xl border text-left transition-transform hover:-translate-y-0.5"
-          style={{
-            borderColor: AppColors.lightGrey,
-            backgroundColor: "#F7F8FB",
-          }}
+          style={{ borderColor: AppColors.lightGrey, backgroundColor: "#F7F8FB" }}
         >
           <div className="flex items-center gap-4 p-4 sm:p-5">
             <div
@@ -252,24 +346,9 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
                 {itemImage ? itemImage.name : "No image selected"}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {itemImage && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleImageChange(null);
-                  }}
-                  className="rounded-full border px-3 py-2 text-xs font-semibold"
-                  style={{ borderColor: AppColors.lightGrey, color: AppColors.greyishBlack, backgroundColor: AppColors.white }}
-                >
-                  Clear
-                </button>
-              )}
-              <span className="material-icons text-2xl" style={{ color: AppColors.grey }}>
-                chevron_right
-              </span>
-            </div>
+            <span className="material-icons text-2xl" style={{ color: AppColors.grey }}>
+              chevron_right
+            </span>
           </div>
         </button>
         {imagePreview && (
@@ -284,25 +363,108 @@ export function AddProductModal({ open, onClose, onSuccess }: AddProductModalPro
 
         <div className="flex gap-3 pt-2">
           {chipBtn("Pricing", "pricing")}
-          {chipBtn("Stock", "stock")}
+          {showStockTab && chipBtn("Stock", "stock")}
         </div>
 
-        {activeTab === "pricing" ? (
+        {activeTab === "pricing" || !showStockTab ? (
           <div className="space-y-4 pt-2">
-            <AppTextField title="Sale Price" hintText="Sale Price" value={form.salePrice} onChange={set("salePrice")} type="number" />
-            <AppTextField title="Purchase Price" hintText="Purchase Price" value={form.purchasePrice} onChange={set("purchasePrice")} type="number" />
-            <AppTextField title="Wholesale Price" hintText="Wholesale Price" value={form.wholesalePrice} onChange={set("wholesalePrice")} type="number" />
+            <div
+              className={clsx(
+                "grid grid-cols-1 gap-4",
+                itemSettings.wholesalePrice ? "sm:grid-cols-3" : "sm:grid-cols-2"
+              )}
+            >
+              <AppTextField
+                title="Purchase Price"
+                hintText="Purchase Price"
+                value={form.purchasePrice}
+                onChange={set("purchasePrice")}
+                type="number"
+              />
+              {itemSettings.wholesalePrice && (
+                <AppTextField
+                  title="Wholesale Price"
+                  hintText="Wholesale Price"
+                  value={form.wholesalePrice}
+                  onChange={set("wholesalePrice")}
+                  type="number"
+                />
+              )}
+              <AppTextField
+                title="Sale Price"
+                hintText="Sale Price"
+                value={form.salePrice}
+                onChange={set("salePrice")}
+                type="number"
+              />
+            </div>
+            {itemSettings.itemWiseTax && (
+              <AppTextField
+                title="Tax %"
+                hintText="0"
+                value={form.taxPercent}
+                onChange={set("taxPercent")}
+                type="number"
+              />
+            )}
+            {itemSettings.itemWiseDiscountRs && (
+              <AppTextField
+                title="Discount (Rs)"
+                hintText="0"
+                value={form.discountRs}
+                onChange={set("discountRs")}
+                type="number"
+              />
+            )}
+            {itemSettings.itemWiseDiscountPercent && (
+              <AppTextField
+                title="Discount %"
+                hintText="0"
+                value={form.discountPercent}
+                onChange={set("discountPercent")}
+                type="number"
+              />
+            )}
           </div>
         ) : (
           <div className="space-y-4 pt-2">
-            <AppTextField title="Opening Stock" hintText="Ex: 300" value={form.openingStock} onChange={set("openingStock")} type="number" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <AppTextField title="As of Date" hintText="19/11/2025" value={form.asOfDate} onChange={set("asOfDate")} isDateField />
-              <AppTextField title="At Price/Unit" hintText="Ex: 2,000" value={form.atPrice} onChange={set("atPrice")} type="number" />
+            <AppTextField
+              title="Opening Stock"
+              hintText="Ex: 300"
+              value={form.openingStock}
+              onChange={set("openingStock")}
+              type="number"
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <AppTextField
+                title="As of Date"
+                hintText="19/11/2025"
+                value={form.asOfDate}
+                onChange={set("asOfDate")}
+                isDateField
+              />
+              <AppTextField
+                title="At Price/Unit"
+                hintText="Ex: 2,000"
+                value={form.atPrice}
+                onChange={set("atPrice")}
+                type="number"
+              />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <AppTextField title="Min Stock Qty" hintText="Ex: 5" value={form.minStockQty} onChange={set("minStockQty")} type="number" />
-              <AppTextField title="Item Location" hintText="Item Location" value={form.itemLocation} onChange={set("itemLocation")} />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <AppTextField
+                title="Min Stock Qty"
+                hintText="Ex: 5"
+                value={form.minStockQty}
+                onChange={set("minStockQty")}
+                type="number"
+              />
+              <AppTextField
+                title="Item Location"
+                hintText="Item Location"
+                value={form.itemLocation}
+                onChange={set("itemLocation")}
+              />
             </div>
           </div>
         )}

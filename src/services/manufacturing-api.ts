@@ -21,9 +21,54 @@ export type ManufacturingRecord = {
   sale_price?: number | string | null;
   description?: string | null;
   raw_items?: ManufacturingRawItem[];
+  /** Production runs only: the finished catalogue item and what the run cost. */
+  item_id?: number | null;
+  quantity?: number | string | null;
+  total_cost?: number | string | null;
+  unit_cost?: number | string | null;
+  mfg_date?: string | null;
+  already_exists?: boolean;
   created_at?: string;
   updated_at?: string;
 };
+
+export type ProduceManufacturingPayload = {
+  /** Same key on a retry → the server returns the first run instead of moving stock again. */
+  requestKey: string;
+  quantity: number;
+  /** Existing product to add stock to; omit to create a new product from the fields below. */
+  finishedItemId?: number | null;
+  name?: string;
+  itemUnit?: string | null;
+  itemCategory?: string | null;
+  wholesalePrice?: string | number;
+  salePrice?: string | number;
+  updateItemCost?: boolean;
+  description?: string;
+  materials: Array<{ itemId: number; quantity: number }>;
+};
+
+const optionalNumber = (value?: string | number) =>
+  value === undefined || String(value).trim() === "" ? undefined : Number(value);
+
+/** Saves a production run: consumes material stock, adds finished stock, costs it from purchase prices. */
+export async function produceManufacturing(payload: ProduceManufacturingPayload) {
+  const response = await apiClient.post<ApiEnvelope<ManufacturingRecord>>("/manufacturing/", {
+    produce: true,
+    request_key: payload.requestKey,
+    quantity: payload.quantity,
+    finished_item_id: payload.finishedItemId || undefined,
+    name: payload.name?.trim() || undefined,
+    item_unit: payload.itemUnit || undefined,
+    item_category: payload.itemCategory || undefined,
+    wholesale_price: optionalNumber(payload.wholesalePrice),
+    sale_price: optionalNumber(payload.salePrice),
+    update_item_cost: payload.updateItemCost,
+    description: payload.description?.trim() ?? "",
+    raw_items: payload.materials.map((m) => ({ item_id: m.itemId, quantity: m.quantity })),
+  });
+  return unwrap(response);
+}
 
 export type CreateManufacturingPayload = {
   name: string;

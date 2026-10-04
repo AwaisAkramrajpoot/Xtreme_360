@@ -20,6 +20,8 @@ export type PartyRecord = {
   cnc_back_picture?: string | null;
   address?: string | null;
   emergency_number?: string | null;
+  tin_number?: string | null;
+  shipping_address?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -39,6 +41,8 @@ export type CreatePartyPayload = {
   cncNumber?: string;
   address?: string;
   emergencyNumber?: string;
+  tinNumber?: string;
+  shippingAddress?: string;
   cncFrontPicture?: File | null;
   cncBackPicture?: File | null;
 };
@@ -64,6 +68,8 @@ export async function createParty(payload: CreatePartyPayload) {
   appendIfPresent(formData, "cnc_number", payload.cncNumber);
   appendIfPresent(formData, "address", payload.address);
   appendIfPresent(formData, "emergency_number", payload.emergencyNumber);
+  appendIfPresent(formData, "tin_number", payload.tinNumber);
+  appendIfPresent(formData, "shipping_address", payload.shippingAddress);
   if (payload.cncFrontPicture) {
     formData.append("cnc_front_picture", payload.cncFrontPicture);
   }
@@ -93,6 +99,8 @@ export async function updateParty(partyId: number, payload: CreatePartyPayload) 
   appendIfPresent(formData, "cnc_number", payload.cncNumber);
   appendIfPresent(formData, "address", payload.address);
   appendIfPresent(formData, "emergency_number", payload.emergencyNumber);
+  appendIfPresent(formData, "tin_number", payload.tinNumber);
+  appendIfPresent(formData, "shipping_address", payload.shippingAddress);
   if (payload.cncFrontPicture) {
     formData.append("cnc_front_picture", payload.cncFrontPicture);
   }

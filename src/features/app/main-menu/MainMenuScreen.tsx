@@ -8,7 +8,9 @@ import { mainMenuItems } from "@/constants/menu-data";
 import { RouteName } from "@/constants/routes";
 import { useAuthStore } from "@/stores/auth-store";
 import { logoutUser } from "@/services/session-api";
-import { useLayoutContext } from "@/components/layout/LayoutContext";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { useLoadingStore } from "@/stores/loading-store";
+import { useRouteEnabled } from "@/hooks/use-route-enabled";
 
 const MENU_META: Record<string, { icon: string; tint: string }> = {
   "Business Detail": { icon: "storefront", tint: "#E8F1E8" },
@@ -36,21 +38,33 @@ const MENU_META: Record<string, { icon: string; tint: string }> = {
 export function MainMenuScreen() {
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
-  const { isDashboardShell } = useLayoutContext();
+  const { confirm } = useConfirm();
+  const showLoading = useLoadingStore((s) => s.show);
+  const hideLoading = useLoadingStore((s) => s.hide);
   const [busyIndex, setBusyIndex] = useState<number | null>(null);
 
-  const items = mainMenuItems.filter((item) => item.title !== "Log Out");
+  const isEnabled = useRouteEnabled();
+  const items = mainMenuItems.filter((item) => item.title !== "Log Out" && isEnabled(item.href));
   const logoutItem = mainMenuItems.find((item) => item.title === "Log Out");
 
   const handleItemClick = async (index: number, href?: string, isLogout = false) => {
     setBusyIndex(index);
     try {
       if (isLogout) {
-        if (!confirm("Are you sure you want to log out?")) return;
+        const ok = await confirm({
+          title: "Log Out",
+          message: "Are you sure you want to log out?",
+          confirmLabel: "Log Out",
+          danger: true,
+        });
+        if (!ok) return;
+        showLoading("Logging out...");
         try {
           await logoutUser();
         } catch {
           // Clear local session even if the API call fails.
+        } finally {
+          hideLoading();
         }
         logout();
         router.replace(RouteName.welcome);
@@ -63,15 +77,10 @@ export function MainMenuScreen() {
   };
 
   return (
-    <div className="flex min-h-full flex-col bg-[#F7F8FB]">
-      <AppAppBar
-        title="Main Menu"
-        showNotification
-        showAvatar
-        showBack={!isDashboardShell}
-      />
+    <div className="flex min-h-full flex-col">
+      <AppAppBar title="Main Menu" showNotification showAvatar showBack />
 
-      <div className="flex-1 px-1 pb-8 pt-2 sm:px-2">
+      <div className="flex-1 pb-8">
         <div className="mb-5">
           <h2
             className="text-xl font-bold text-black sm:text-2xl"

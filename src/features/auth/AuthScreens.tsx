@@ -16,8 +16,9 @@ import {
   verifyOtp,
 } from "@/services/session-api";
 import { useAuthStore } from "@/stores/auth-store";
-import { getApiErrorMessage } from "@/utils/api-error";
+import { getApiErrorCode, getApiErrorMessage } from "@/utils/api-error";
 import { isValidEmail } from "@/utils/helpers";
+import { AccountStatusNotice } from "./AccountStatusNotice";
 
 function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const digits = value.padEnd(5, " ").split("").slice(0, 5);
@@ -122,11 +123,16 @@ export function VerifyOtpScreen() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email") ?? "";
   const flow = searchParams.get("flow") ?? "signup";
+  const justRegistered = searchParams.get("registered") === "1";
   const setToken = useAuthStore((s) => s.setToken);
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const [info, setInfo] = useState(
+    flow === "signup" && justRegistered ? "Account created. Verify your email to send it for admin approval." : ""
+  );
+  // Set when the email is verified but the account still needs Super Admin approval (or was rejected).
+  const [accountNotice, setAccountNotice] = useState<{ status: "pending" | "rejected"; message: string } | null>(null);
 
   const handleVerifyOtp = async () => {
     if (!email) {
@@ -142,10 +148,21 @@ export function VerifyOtpScreen() {
     setError("");
     setInfo("");
     try {
-      const { accessToken } = await verifyOtp({ email, otp });
+      const { accessToken, approvalStatus, message } = await verifyOtp({ email, otp });
 
       if (flow === "reset") {
         router.replace(`${RouteName.newPassword}?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
+      if (!accessToken) {
+        setAccountNotice({
+          status: "pending",
+          message:
+            approvalStatus === "pending" && message
+              ? message
+              : "Your account has been created successfully and is awaiting admin approval.",
+        });
         return;
       }
 
@@ -158,6 +175,10 @@ export function VerifyOtpScreen() {
         router.replace(RouteName.businessRegisteration);
       }
     } catch (err) {
+      if (getApiErrorCode(err) === "account_rejected") {
+        setAccountNotice({ status: "rejected", message: getApiErrorMessage(err, "Your account was not approved.") });
+        return;
+      }
       setError(getApiErrorMessage(err, "Unable to verify code"));
     } finally {
       setLoading(false);
@@ -182,6 +203,26 @@ export function VerifyOtpScreen() {
 
     router.push(RouteName.login);
   };
+
+  if (accountNotice) {
+    return (
+      <AuthSplitLayout
+        title={accountNotice.status === "pending" ? "Email Verified" : "Registration Update"}
+        subtitle={accountNotice.status === "pending" ? "One more step before you can sign in." : "Your account cannot be used."}
+      >
+        <div className="space-y-6">
+          <AccountStatusNotice status={accountNotice.status} message={accountNotice.message} />
+          {accountNotice.status === "pending" && (
+            <p className="text-sm leading-relaxed" style={{ color: AppColors.grey }}>
+              An administrator will review your registration. Once it is approved, sign in with the email and password you
+              registered with.
+            </p>
+          )}
+          <AppButton text="Back to Login" type="button" onClick={() => router.replace(RouteName.login)} />
+        </div>
+      </AuthSplitLayout>
+    );
+  }
 
   return (
     <AuthSplitLayout

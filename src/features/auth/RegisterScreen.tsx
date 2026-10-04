@@ -27,6 +27,7 @@ export function RegisterScreen() {
     if (!email) next.email = "Please enter your email";
     else if (!isValidEmail(email)) next.email = "Please enter a valid email";
     if (!password) next.password = "Please enter your password";
+    else if (password.length < 6) next.password = "Password must be at least 6 characters";
     if (!confirmPassword) next.confirmPassword = "Please confirm your password";
     else if (password !== confirmPassword) next.confirmPassword = "Passwords do not match";
     setErrors(next);
@@ -45,7 +46,7 @@ export function RegisterScreen() {
         password,
         confirmPassword,
       });
-      router.push(`${RouteName.verifyOtp}?email=${encodeURIComponent(email)}&flow=signup`);
+      router.push(`${RouteName.verifyOtp}?email=${encodeURIComponent(email)}&flow=signup&registered=1`);
     } catch (error) {
       setSubmitError(getApiErrorMessage(error, "Unable to create account"));
     } finally {

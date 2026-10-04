@@ -19,6 +19,10 @@ export type ItemRecord = {
   at_price?: number | string | null;
   min_stock_qty?: number | string | null;
   item_location?: string | null;
+  tax_percent?: number | string | null;
+  discount_rs?: number | string | null;
+  discount_percent?: number | string | null;
+  extra_json?: Record<string, string> | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -46,6 +50,19 @@ export type CreateItemPayload = {
   atPrice?: string | number;
   minStockQty?: string | number;
   itemLocation?: string;
+  taxPercent?: string | number;
+  discountRs?: string | number;
+  discountPercent?: string | number;
+  brand?: string;
+  serialNumber?: string;
+  modelNumber?: string;
+  warranty?: string;
+  manufacturingDate?: string;
+  expiryDate?: string;
+  batch?: string;
+  weight?: string;
+  color?: string;
+  size?: string;
   itemImage?: File | null;
 };
 
@@ -72,6 +89,19 @@ export async function createItem(payload: CreateItemPayload) {
   appendIfPresent(formData, "at_price", payload.atPrice);
   appendIfPresent(formData, "min_stock_qty", payload.minStockQty);
   appendIfPresent(formData, "item_location", payload.itemLocation);
+  appendIfPresent(formData, "tax_percent", payload.taxPercent);
+  appendIfPresent(formData, "discount_rs", payload.discountRs);
+  appendIfPresent(formData, "discount_percent", payload.discountPercent);
+  appendIfPresent(formData, "brand", payload.brand);
+  appendIfPresent(formData, "serial_number", payload.serialNumber);
+  appendIfPresent(formData, "model_number", payload.modelNumber);
+  appendIfPresent(formData, "warranty", payload.warranty);
+  appendIfPresent(formData, "manufacturing_date", payload.manufacturingDate);
+  appendIfPresent(formData, "expiry_date", payload.expiryDate);
+  appendIfPresent(formData, "batch", payload.batch);
+  appendIfPresent(formData, "weight", payload.weight);
+  appendIfPresent(formData, "color", payload.color);
+  appendIfPresent(formData, "size", payload.size);
   if (payload.itemImage) {
     formData.append("item_image", payload.itemImage);
   }

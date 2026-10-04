@@ -1,3 +1,5 @@
+/* Icon font loaded into the base layer so Tailwind size/layout utilities on icons take effect. */
+@import url("https://fonts.googleapis.com/icon?family=Material+Icons") layer(base);
 @import "tailwindcss";
 
 @font-face {
@@ -78,6 +80,7 @@ button {
   font-family: inherit;
 }
 
+@layer base {
 .material-icons {
   font-family: "Material Icons";
   font-weight: normal;
@@ -91,6 +94,8 @@ button {
   word-wrap: normal;
   direction: ltr;
   -webkit-font-smoothing: antialiased;
+  vertical-align: middle;
+}
 }
 
 /* Sidebar scroll — touch-friendly, contained overflow */
@@ -114,4 +119,21 @@ button {
 .sidebar-scroll::-webkit-scrollbar-thumb {
   background-color: #c4c4c4;
   border-radius: 4px;
+}
+
+/* Settings search: hide sections without a matching row, and the empty state when rows match. */
+.settings-list[data-searching] .settings-section:not(:has([data-settings-row])) {
+  display: none;
+}
+.settings-list:has([data-settings-row]) > .settings-empty {
+  display: none;
+}
+
+/* Route change progress bar */
+@keyframes route-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.route-progress {
+  animation: route-progress 450ms ease-out forwards;
 }

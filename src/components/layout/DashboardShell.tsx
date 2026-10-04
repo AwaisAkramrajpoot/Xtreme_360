@@ -12,6 +12,9 @@ import { DashboardHeader, DashboardSidebar } from "./DashboardSidebar";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { useSessionProfile } from "@/hooks/use-session-profile";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useRole } from "@/hooks/use-role";
+import { canAccessRoute, requiredRoleFor, ROLE_LABELS } from "@/constants/permissions";
+import { NoAccess } from "./NoAccess";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -27,6 +30,8 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const loadedToken = useSessionProfileStore((s) => s.loadedToken);
   const loadSettings = useSettingsStore((s) => s.loadSettings);
   const settingsLoaded = useSettingsStore((s) => s.loaded);
+  const role = useRole();
+  const allowed = canAccessRoute(pathname || "", role);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -123,7 +128,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             )}
           >
             <div className="max-w-[1600px] mx-auto w-full min-w-0 pb-4 lg:pb-6">
-              {children}
+              {allowed ? children : <NoAccess requiredRole={ROLE_LABELS[requiredRoleFor(pathname || "")]} />}
             </div>
           </main>
           {isMobile && <MobileBottomNav />}

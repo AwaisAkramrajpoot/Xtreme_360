@@ -1,7 +1,14 @@
 import { AppColors } from "@/constants/colors";
-import { quotationMetrics } from "./home-dashboard-data";
+import type { DashboardSummary } from "@/services/dashboard-api";
 
-export function QuotationSummary() {
+export function QuotationSummary({ quotations }: { quotations: DashboardSummary["quotations"] }) {
+  const metrics = [
+    { label: "Pending", count: quotations.pending },
+    { label: "Approved", count: quotations.approved },
+    { label: "Rejected", count: quotations.rejected },
+    { label: "Total", count: quotations.total },
+  ];
+
   return (
     <div className="min-w-0">
       <h2
@@ -15,7 +22,7 @@ export function QuotationSummary() {
       </p>
       <div className="h-3 sm:h-4" />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        {quotationMetrics.map((m) => (
+        {metrics.map((m) => (
           <div
             key={m.label}
             className="py-3 px-2 rounded-lg text-center min-w-0"

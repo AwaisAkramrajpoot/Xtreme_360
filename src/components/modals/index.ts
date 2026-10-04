@@ -14,6 +14,6 @@ export {
   AddCategoryModal,
   AddUnitModal,
   AddServiceModal,
-  AddManufacturingModal,
 } from "./AddSimpleModals";
+export { AddManufacturingModal } from "./AddManufacturingModal";
 export { AddExpenseModal, AddEmployeeModal } from "./AddExpenseEmployeeModals";

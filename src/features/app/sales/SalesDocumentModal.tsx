@@ -5,9 +5,11 @@ import { AppModal } from "@/components/ui/AppModal";
 import { AppTextField } from "@/components/ui/AppTextField";
 import { AppDropDown } from "@/components/ui/AppDropDown";
 import { FormButtonsRow } from "@/components/ui/FormButtonsRow";
+import { NewItemModal } from "@/components/modals/NewItemModal";
 import { AppColors } from "@/constants/colors";
 import { getParties, type PartyRecord } from "@/services/party-api";
 import { getItems, type ItemRecord } from "@/services/item-api";
+import { getAccounts } from "@/services/cash-bank-api";
 import {
   createSalesDocument,
   getNextSalesDocNo,
@@ -19,6 +21,8 @@ import {
 import { getApiErrorMessage } from "@/utils/api-error";
 import type { SalesModuleConfig } from "./sales-config";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { formatMoney, type PartySettings } from "@/constants/app-settings";
 
 type LineDraft = {
   key: string;
@@ -63,10 +67,10 @@ function lineAmount(
 }
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString("en-CA");
 }
 
-function partyDetailRows(party: PartyRecord | null) {
+function partyDetailRows(party: PartyRecord | null, partySettings: PartySettings) {
   if (!party) return [];
   const rows: Array<{ label: string; value: string }> = [
     { label: "Party Name", value: party.party_name || "" },
@@ -80,6 +84,11 @@ function partyDetailRows(party: PartyRecord | null) {
     { label: "Zone", value: party.zone || "" },
     { label: "Country", value: party.country || "" },
     { label: "CNC / NTN", value: party.cnc_number || "" },
+    { label: "NTN", value: partySettings.tinNumber ? party.tin_number || "" : "" },
+    {
+      label: "Shipping Address",
+      value: partySettings.partyShippingAddress ? party.shipping_address || "" : "",
+    },
     {
       label: "Opening Balance",
       value:
@@ -108,7 +117,10 @@ export function SalesDocumentModal({
 }: SalesDocumentModalProps) {
   const [parties, setParties] = useState<PartyRecord[]>([]);
   const [items, setItems] = useState<ItemRecord[]>([]);
+  /** Line whose item picker opened "Add New Item"; the new item is filled into it. */
+  const [newItemForLine, setNewItemForLine] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<SalesDocument[]>([]);
+  const [bankAccountNames, setBankAccountNames] = useState<string[]>([]);
   const [partyKey, setPartyKey] = useState<string | null>(null);
   const [docNo, setDocNo] = useState("");
   const [docDate, setDocDate] = useState(today());
@@ -132,6 +144,12 @@ export function SalesDocumentModal({
   const enableDiscount = useSettingsStore((s) => s.enableDiscount);
   const settingsLoaded = useSettingsStore((s) => s.loaded);
   const loadSettings = useSettingsStore((s) => s.loadSettings);
+  const general = useSettingsStore((s) => s.app.general);
+  const transaction = useSettingsStore((s) => s.app.transaction);
+  const cashSaleByDefault = transaction.cashSaleByDefault;
+  const partySettings = useSettingsStore((s) => s.app.party);
+  const { confirm } = useConfirm();
+  const money = (value: number) => formatMoney(value, general);
 
   const docNoLabel = config.docNoLabel || "Document No";
   const isQuotation = config.docType === "quotation";
@@ -160,7 +178,10 @@ export function SalesDocumentModal({
     return parties.find((p) => String(p.id) === idStr) || null;
   }, [partyKey, parties]);
 
-  const partyInfo = useMemo(() => partyDetailRows(selectedParty), [selectedParty]);
+  const partyInfo = useMemo(
+    () => partyDetailRows(selectedParty, partySettings),
+    [selectedParty, partySettings]
+  );
 
   const totals = useMemo(() => {
     if (!config.showItems) {
@@ -186,6 +207,62 @@ export function SalesDocumentModal({
     return { subtotal, discount, tax, total };
   }, [amount, config.showItems, enableDiscount, enableTax, lines]);
 
+  // Transaction › Show profit: margin over item purchase prices, before tax.
+  const profit = useMemo(() => {
+    if (!transaction.showProfit || config.docType !== "sales_invoice" || !config.showItems) return null;
+    let value = 0;
+    for (const line of lines) {
+      if (!line.itemName.trim()) continue;
+      const qty = Number(line.quantity) || 0;
+      const disc = enableDiscount ? Number(line.discount) || 0 : 0;
+      const cost = Number(items.find((i) => i.id === line.itemId)?.purchase_price) || 0;
+      value += qty * (Number(line.rate) || 0) - disc - qty * cost;
+    }
+    return value;
+  }, [transaction.showProfit, config.docType, config.showItems, lines, items, enableDiscount]);
+
+  // Snapshot of every editable field, used by General › "Show warning for unsaved changes".
+  const formSnapshot = JSON.stringify({
+    partyKey,
+    docNo,
+    docDate,
+    dueDate,
+    status,
+    notes,
+    terms,
+    paymentMode,
+    bankAccount,
+    referenceNo,
+    amount,
+    linkedInvoice: linkedInvoiceKey?.split("::")[0] ?? null,
+    deliveryAddress,
+    transporter,
+    vehicleNo,
+    lines: lines.map((line) => ({ ...line, key: undefined })),
+  });
+  const [baseline, setBaseline] = useState<string | null>(null);
+  const [baselinePending, setBaselinePending] = useState(false);
+  // Capture the freshly initialised form as the baseline (state adjusted during render).
+  if (baselinePending) {
+    setBaselinePending(false);
+    setBaseline(formSnapshot);
+  }
+  const isDirty = baseline !== null && baseline !== formSnapshot;
+
+  const requestClose = async () => {
+    if (loading) return;
+    if (general.showUnsavedWarning && isDirty) {
+      const ok = await confirm({
+        title: "Discard changes?",
+        message: "You have unsaved changes. Close without saving?",
+        confirmLabel: "Discard",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    onClose();
+  };
+
   useEffect(() => {
     if (!open) return;
     if (!settingsLoaded) {
@@ -202,8 +279,13 @@ export function SalesDocumentModal({
         if (cancelled) return;
         setParties(partyList);
         setItems(itemList);
+        if (config.showPaymentFields) {
+          // Non-cash payments post to one of these accounts (Cash & Bank balances use it).
+          const accounts = await getAccounts("bank").catch(() => []);
+          if (!cancelled) setBankAccountNames(accounts.map((a) => a.account_name));
+        }
         if (config.showLinkedInvoice) {
-          const inv = await getSalesDocuments("sales_invoice");
+          const inv = await getSalesDocuments(config.linkedDocType ?? "sales_invoice");
           if (!cancelled) setInvoices(inv);
         }
       } catch (err) {
@@ -213,13 +295,14 @@ export function SalesDocumentModal({
     return () => {
       cancelled = true;
     };
-  }, [open, config.showLinkedInvoice]);
+  }, [open, config.showLinkedInvoice, config.linkedDocType, config.showPaymentFields]);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
 
     (async () => {
+      setBaseline(null);
       if (initial) {
         setDocNo(initial.doc_no || "");
         setDocDate((initial.doc_date || today()).toString().slice(0, 10));
@@ -260,7 +343,12 @@ export function SalesDocumentModal({
       } else {
         setDocDate(today());
         setDueDate("");
-        setStatus(config.statuses[0]);
+        // Transaction › Cash sale by default: new invoices start as paid.
+        setStatus(
+          cashSaleByDefault && config.docType === "sales_invoice" && config.statuses.includes("paid")
+            ? "paid"
+            : config.statuses[0]
+        );
         setNotes("");
         setTerms("");
         setPaymentMode("Cash");
@@ -280,12 +368,17 @@ export function SalesDocumentModal({
           if (!cancelled) setDocNo("");
         }
       }
-      if (!cancelled) setError("");
+      if (!cancelled) {
+        setError("");
+        setBaselinePending(true);
+      }
     })();
 
     return () => {
       cancelled = true;
     };
+    // cashSaleByDefault is read once when the form opens; toggling it later must not reset the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial, config.statuses, config.docType]);
 
   useEffect(() => {
@@ -298,8 +391,31 @@ export function SalesDocumentModal({
     }
   }, [open, initial, invoices]);
 
+  const onPickParty = (value: string) => {
+    setPartyKey(value);
+    // Party Settings › Shipping address: prefill the delivery address for delivery notes.
+    if (config.showDeliveryFields && partySettings.partyShippingAddress && !deliveryAddress.trim()) {
+      const party = parties.find((p) => String(p.id) === value.split("::")[0]);
+      const address = party?.shipping_address || party?.address || "";
+      if (address) setDeliveryAddress(address);
+    }
+  };
+
   const updateLine = (key: string, patch: Partial<LineDraft>) => {
     setLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+  };
+
+  const onItemCreated = (item: ItemRecord) => {
+    setItems((prev) => [item, ...prev.filter((i) => i.id !== item.id)]);
+    if (newItemForLine) {
+      updateLine(newItemForLine, {
+        itemId: item.id,
+        itemName: item.item_name,
+        itemCode: item.item_code || "",
+        unit: item.item_unit || "",
+        rate: String(item[config.priceField ?? "sale_price"] ?? 0),
+      });
+    }
   };
 
   const onPickItem = (key: string, value: string) => {
@@ -310,7 +426,7 @@ export function SalesDocumentModal({
       itemName: item?.item_name || nameParts.join("::"),
       itemCode: item?.item_code || "",
       unit: item?.item_unit || "",
-      rate: String(item?.sale_price ?? 0),
+      rate: String(item?.[config.priceField ?? "sale_price"] ?? 0),
     });
   };
 
@@ -350,7 +466,7 @@ export function SalesDocumentModal({
       notes,
       terms,
       paymentMode: config.showPaymentFields ? paymentMode : undefined,
-      bankAccount: config.showPaymentFields ? bankAccount : undefined,
+      bankAccount: config.showPaymentFields && paymentMode !== "Cash" ? bankAccount : undefined,
       referenceNo: config.showPaymentFields ? referenceNo : undefined,
       deliveryAddress: config.showDeliveryFields ? deliveryAddress : undefined,
       transporter: config.showDeliveryFields ? transporter : undefined,
@@ -402,18 +518,18 @@ export function SalesDocumentModal({
             <>
               <div className="flex justify-between gap-4">
                 <span style={{ color: AppColors.grey }}>Subtotal</span>
-                <b>Rs. {totals.subtotal.toFixed(2)}</b>
+                <b>{money(totals.subtotal)}</b>
               </div>
               {enableDiscount && (
                 <div className="flex justify-between gap-4">
                   <span style={{ color: AppColors.grey }}>Discount</span>
-                  <b>Rs. {totals.discount.toFixed(2)}</b>
+                  <b>{money(totals.discount)}</b>
                 </div>
               )}
               {enableTax && (
                 <div className="flex justify-between gap-4">
                   <span style={{ color: AppColors.grey }}>Tax</span>
-                  <b>Rs. {totals.tax.toFixed(2)}</b>
+                  <b>{money(totals.tax)}</b>
                 </div>
               )}
               <div className="h-px" style={{ backgroundColor: AppColors.lightGrey }} />
@@ -421,20 +537,26 @@ export function SalesDocumentModal({
           )}
       <div className="flex justify-between gap-4 text-base">
         <span className="font-semibold">Grand Total</span>
-        <b>Rs. {totals.total.toFixed(2)}</b>
+        <b>{money(totals.total)}</b>
       </div>
+      {profit !== null && (
+        <div className="flex justify-between gap-4 text-sm">
+          <span style={{ color: AppColors.grey }}>Estimated Profit</span>
+          <b style={{ color: profit >= 0 ? AppColors.primary : "#D64545" }}>{money(profit)}</b>
+        </div>
+      )}
     </div>
   );
 
   return (
     <AppModal
       open={open}
-      onClose={onClose}
+      onClose={() => void requestClose()}
       title={initial ? `Edit ${config.title}` : config.addTitle}
       size="xl"
       footer={
         <FormButtonsRow
-          onCancel={onClose}
+          onCancel={() => void requestClose()}
           onSave={handleSave}
           saveLabel={initial ? "Update" : isQuotation ? "Save Quotation" : "Save"}
           isLoading={loading}
@@ -472,16 +594,19 @@ export function SalesDocumentModal({
             title="Party"
             items={partyOptions}
             value={partyKey}
-            onChange={setPartyKey}
-            hintText="Select customer"
+            onChange={onPickParty}
+            hintText={config.partyHint ?? "Select customer"}
             getLabel={(v) => v.split("::").slice(1).join("::")}
           />
-          <AppTextField
-            title={docNoLabel}
-            hintText="e.g. QT-00001"
-            value={docNo}
-            onChange={setDocNo}
-          />
+          {/* Transaction › Invoice/Bill number: the number is still assigned automatically when hidden. */}
+          {(transaction.invoiceBillNo || !docNo.trim()) && (
+            <AppTextField
+              title={docNoLabel}
+              hintText="e.g. QT-00001"
+              value={docNo}
+              onChange={setDocNo}
+            />
+          )}
         </div>
 
         {/* Status + linked invoice */}
@@ -497,7 +622,7 @@ export function SalesDocumentModal({
           )}
           {config.showLinkedInvoice && (
             <AppDropDown
-              title="Linked Invoice"
+              title={config.linkedLabel ?? "Linked Invoice"}
               items={invoiceOptions}
               value={linkedInvoiceKey}
               onChange={setLinkedInvoiceKey}
@@ -535,7 +660,19 @@ export function SalesDocumentModal({
               value={paymentMode}
               onChange={setPaymentMode}
             />
-            <AppTextField title="Bank / Cash Account" hintText="Optional" value={bankAccount} onChange={setBankAccount} />
+            {paymentMode === "Cash" ? (
+              <AppTextField title="Account" value="Cash in hand" onChange={() => undefined} readOnly />
+            ) : bankAccountNames.length ? (
+              <AppDropDown
+                title="Bank Account"
+                items={Array.from(new Set([...bankAccountNames, ...(bankAccount ? [bankAccount] : [])]))}
+                value={bankAccount || null}
+                onChange={setBankAccount}
+                hintText="Select bank account"
+              />
+            ) : (
+              <AppTextField title="Bank Account" hintText="Add accounts in Cash & Bank" value={bankAccount} onChange={setBankAccount} />
+            )}
             <AppTextField title="Reference / Receipt No" hintText="Optional" value={referenceNo} onChange={setReferenceNo} />
           </div>
         )}
@@ -584,6 +721,9 @@ export function SalesDocumentModal({
                       onChange={(v) => onPickItem(line.key, v)}
                       hintText="Select item"
                       getLabel={(v) => v.split("::").slice(1).join("::")}
+                      emptyText="No items yet"
+                      actionLabel="Add New Item"
+                      onAction={() => setNewItemForLine(line.key)}
                     />
                   </div>
                   <div className="md:col-span-1">
@@ -626,7 +766,7 @@ export function SalesDocumentModal({
                     <AppTextField
                       title="Amount"
                       hintText="0"
-                      value={lineAmount(line, calcOptions).toFixed(2)}
+                      value={lineAmount(line, calcOptions).toFixed(general.decimalPlaces)}
                       onChange={() => undefined}
                       readOnly
                     />
@@ -653,6 +793,12 @@ export function SalesDocumentModal({
                       <span className="material-icons">delete</span>
                     </button>
                   </div>
+                  {transaction.displayPurchasePrice && line.itemId && (
+                    <p className="md:col-span-12 text-xs" style={{ color: AppColors.grey }}>
+                      Purchase price:{" "}
+                      {money(Number(items.find((i) => i.id === line.itemId)?.purchase_price) || 0)}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -677,6 +823,11 @@ export function SalesDocumentModal({
           )}
         </div>
       </div>
+      <NewItemModal
+        open={newItemForLine !== null}
+        onClose={() => setNewItemForLine(null)}
+        onCreated={onItemCreated}
+      />
     </AppModal>
   );
 }

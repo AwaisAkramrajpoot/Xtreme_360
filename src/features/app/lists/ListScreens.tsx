@@ -8,12 +8,13 @@ import { IconButton } from "@/components/ui/IconButton";
 import { useModal } from "@/hooks/use-modal";
 import { useToast } from "@/hooks/use-toast";
 import { AppColors } from "@/constants/colors";
-import { useLayoutContext } from "@/components/layout/LayoutContext";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 import type { EntityModalType } from "@/components/modals";
 import { deleteParty, getParties, type PartyRecord } from "@/services/party-api";
 import { deleteEmployee, getEmployees, type EmployeeRecord } from "@/services/employee-api";
 import { deleteExpense, getExpenses, type ExpenseRecord } from "@/services/expense-api";
 import { getApiErrorMessage } from "@/utils/api-error";
+import { useLoadingStore } from "@/stores/loading-store";
 
 export interface ListCardAction {
   onEdit?: () => void;
@@ -84,9 +85,11 @@ interface ExpenseCardProps extends ListCardAction {
   date: string;
   category: string;
   totalAmount: string;
+  /** e.g. "Cash" or "Online · Meezan" */
+  paidFrom?: string;
 }
 
-export function ExpenseCard({ expenseNo, date, category, totalAmount, onEdit, onDelete }: ExpenseCardProps) {
+export function ExpenseCard({ expenseNo, date, category, totalAmount, paidFrom, onEdit, onDelete }: ExpenseCardProps) {
   return (
     <div
       className="h-full rounded-2xl border bg-white p-4 lg:p-5"
@@ -99,6 +102,11 @@ export function ExpenseCard({ expenseNo, date, category, totalAmount, onEdit, on
             {date}
           </p>
           <p className="text-sm text-black">{category}</p>
+          {paidFrom && (
+            <p className="text-xs" style={{ color: AppColors.grey }}>
+              Paid from: {paidFrom}
+            </p>
+          )}
           <p className="mt-1 text-base font-semibold" style={{ color: AppColors.primary }}>
             {totalAmount}
           </p>
@@ -145,7 +153,6 @@ export function ListScreen({
   onSearchChange,
   searchPlaceholder,
 }: ListScreenProps) {
-  const { isDashboardShell } = useLayoutContext();
   const modal = useModal();
   const open = controlledOpen ?? modal.open;
   const openModal = () => {
@@ -165,7 +172,7 @@ export function ListScreen({
       <AppAppBar
         title={title}
         showNotification
-        showBack={!isDashboardShell}
+        showBack
         showSearch
         searchValue={searchValue}
         onSearchChange={onSearchChange}
@@ -198,14 +205,17 @@ function formatMoney(value?: string | null) {
   return `Rs. ${amount.toLocaleString()}`;
 }
 
-export function PartyScreen() {
+export function PartyScreen({ openAdd = false }: { openAdd?: boolean } = {}) {
   const [parties, setParties] = useState<PartyRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingParty, setEditingParty] = useState<PartyRecord | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(openAdd);
   const [search, setSearch] = useState("");
   const { showToast, Toast } = useToast();
+  const { confirm } = useConfirm();
+  const showLoading = useLoadingStore((s) => s.show);
+  const hideLoading = useLoadingStore((s) => s.hide);
 
   const loadParties = useCallback(async () => {
     setLoading(true);
@@ -241,13 +251,22 @@ export function PartyScreen() {
   }, [parties, search]);
 
   const handleDelete = async (partyId: number) => {
-    if (!window.confirm("Delete this party?")) return;
+    const ok = await confirm({
+      title: "Delete party",
+      message: "Delete this party? You can restore it from Utilities › Recycle Bin for 30 days.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    showLoading("Deleting...");
     try {
       await deleteParty(partyId);
       showToast("Party deleted successfully!");
       await loadParties();
     } catch (err) {
       showToast(getApiErrorMessage(err, "Failed to delete party"));
+    } finally {
+      hideLoading();
     }
   };
 
@@ -306,14 +325,17 @@ export function PartyScreen() {
   );
 }
 
-export function ExpenseScreen() {
+export function ExpenseScreen({ openAdd = false }: { openAdd?: boolean } = {}) {
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(openAdd);
   const [search, setSearch] = useState("");
   const { showToast, Toast } = useToast();
+  const { confirm } = useConfirm();
+  const showLoading = useLoadingStore((s) => s.show);
+  const hideLoading = useLoadingStore((s) => s.hide);
 
   const loadExpenses = useCallback(async () => {
     setLoading(true);
@@ -341,6 +363,8 @@ export function ExpenseScreen() {
         expense.date,
         expense.category,
         expense.notes,
+        expense.payment_mode,
+        expense.bank_account,
         expense.total_amount != null ? String(expense.total_amount) : null,
       ]
         .filter(Boolean)
@@ -349,13 +373,22 @@ export function ExpenseScreen() {
   }, [expenses, search]);
 
   const handleDelete = async (expenseId: number) => {
-    if (!window.confirm("Delete this expense?")) return;
+    const ok = await confirm({
+      title: "Delete expense",
+      message: "Delete this expense? You can restore it from Utilities › Recycle Bin for 30 days.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    showLoading("Deleting...");
     try {
       await deleteExpense(expenseId);
       showToast("Expense deleted successfully!");
       await loadExpenses();
     } catch (err) {
       showToast(getApiErrorMessage(err, "Failed to delete expense"));
+    } finally {
+      hideLoading();
     }
   };
 
@@ -396,6 +429,7 @@ export function ExpenseScreen() {
               date={expense.date || "—"}
               category={expense.category || "—"}
               totalAmount={formatMoney(expense.total_amount != null ? String(expense.total_amount) : null)}
+              paidFrom={[expense.payment_mode || "Cash", expense.bank_account].filter(Boolean).join(" · ")}
               onEdit={() => {
                 setEditingExpense(expense);
                 setModalOpen(true);
@@ -409,14 +443,17 @@ export function ExpenseScreen() {
   );
 }
 
-export function EmployeeScreen() {
+export function EmployeeScreen({ openAdd = false }: { openAdd?: boolean } = {}) {
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeRecord | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(openAdd);
   const [search, setSearch] = useState("");
   const { showToast, Toast } = useToast();
+  const { confirm } = useConfirm();
+  const showLoading = useLoadingStore((s) => s.show);
+  const hideLoading = useLoadingStore((s) => s.hide);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
@@ -452,13 +489,22 @@ export function EmployeeScreen() {
   }, [employees, search]);
 
   const handleDelete = async (employeeId: number) => {
-    if (!window.confirm("Delete this employee?")) return;
+    const ok = await confirm({
+      title: "Delete employee",
+      message: "Delete this employee? You can restore it from Utilities › Recycle Bin for 30 days.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    showLoading("Deleting...");
     try {
       await deleteEmployee(employeeId);
       showToast("Employee deleted successfully!");
       await loadEmployees();
     } catch (err) {
       showToast(getApiErrorMessage(err, "Failed to delete employee"));
+    } finally {
+      hideLoading();
     }
   };
 

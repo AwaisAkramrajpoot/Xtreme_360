@@ -32,3 +32,18 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// An expired or revoked token on any authenticated call ends the session. Clearing the token
+// makes DashboardShell (useSessionProfile) redirect to Welcome, so screens never sit on a
+// stream of "Unauthorized" errors. Auth endpoints report 401 as a normal form error instead.
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = String(error?.config?.url || "");
+    if (status === 401 && !url.includes("/auth/") && useAuthStore.getState().token) {
+      useAuthStore.getState().logout();
+    }
+    return Promise.reject(error);
+  }
+);

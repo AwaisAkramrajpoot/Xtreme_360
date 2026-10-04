@@ -17,3 +17,12 @@ export function getApiErrorMessage(error: unknown, fallback = "Something went wr
 
   return fallback;
 }
+
+/** Machine-readable reason sent by the API in `data.code` (e.g. "pending_approval"), if any. */
+export function getApiErrorCode(error: unknown): string | undefined {
+  if (axios.isAxiosError(error)) {
+    const code = (error.response?.data as { data?: { code?: unknown } } | undefined)?.data?.code;
+    if (typeof code === "string") return code;
+  }
+  return undefined;
+}

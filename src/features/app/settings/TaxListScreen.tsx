@@ -1,132 +1,204 @@
 "use client";
 
 import { useState } from "react";
-import { AppAppBar } from "@/components/ui/AppAppBar";
+import { AppModal } from "@/components/ui/AppModal";
 import { AppColors } from "@/constants/colors";
+import type { TaxRate } from "@/constants/app-settings";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { useSettingsStore } from "@/stores/settings-store";
+import { getApiErrorMessage } from "@/utils/api-error";
+import { SettingsLayout, SettingsSection, SettingsSegmented, useSettingsScreen } from "./SettingsUi";
 
-type TaxRate = {
-  id: number;
-  name: string;
-  rate: string;
-};
+const TABS = ["Tax Rates", "Tax Groups"] as const;
+const TAX_NAMES = ["GST", "VAT", "Sales Tax", "Other"] as const;
 
-export function TaxListScreen() {
-  const [activeTab, setActiveTab] = useState<"rates" | "groups">("rates");
-  const [rates, setRates] = useState<TaxRate[]>([{ id: 1, name: "Amir", rate: "3%" }]);
-  const [showModal, setShowModal] = useState(false);
-  const [draftName, setDraftName] = useState("Other");
-  const [draftRate, setDraftRate] = useState("");
+function AddTaxRateModal({ onClose }: { onClose: () => void }) {
+  const rates = useSettingsStore((s) => s.app.taxes.rates);
+  const patchSection = useSettingsStore((s) => s.patchSection);
+  const { notify } = useSettingsScreen();
+  const [name, setName] = useState<string>(TAX_NAMES[0]);
+  const [rate, setRate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSave = () => {
-    const trimmedName = draftName.trim();
-    const trimmedRate = draftRate.trim();
-    if (!trimmedName || !trimmedRate) {
-      setShowModal(false);
-      return;
+  const save = async () => {
+    const trimmedName = name.trim();
+    const value = Number(rate);
+    if (!trimmedName) return setError("Enter a tax name.");
+    if (rate.trim() === "" || !Number.isFinite(value) || value < 0 || value > 100) {
+      return setError("Rate must be a number between 0 and 100.");
     }
-    setRates((prev) => [{ id: Date.now(), name: trimmedName, rate: `${trimmedRate}%` }, ...prev]);
-    setShowModal(false);
-    setDraftName("Other");
-    setDraftRate("");
+    if (rates.some((r) => r.name.toLowerCase() === trimmedName.toLowerCase() && r.rate === value)) {
+      return setError("This tax rate already exists.");
+    }
+
+    const next: TaxRate = { id: `${Date.now()}`, name: trimmedName, rate: value };
+    setSaving(true);
+    setError("");
+    try {
+      await patchSection("taxes", { rates: [next, ...rates] });
+      notify("Tax rate added");
+      onClose();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to save tax rate"));
+    } finally {
+      setSaving(false);
+    }
   };
 
+  const inputClass = "h-11 w-full rounded-lg border px-3 text-sm outline-none focus:border-[#588157]";
+
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <AppAppBar title="Tax List" showBack showSearch />
-      <div className="flex-1 px-3 pt-2">
-        <div className="grid grid-cols-2 overflow-hidden rounded-md border" style={{ borderColor: AppColors.lightGrey }}>
+    <AppModal
+      open
+      onClose={onClose}
+      title="Add Tax Rate"
+      size="sm"
+      footer={
+        <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => setActiveTab("rates")}
-            className="py-2 text-sm"
-            style={{
-              backgroundColor: activeTab === "rates" ? AppColors.primary : AppColors.bgColor2,
-              color: activeTab === "rates" ? AppColors.white : AppColors.black,
-            }}
+            onClick={onClose}
+            className="h-11 flex-1 rounded-lg font-semibold"
+            style={{ backgroundColor: AppColors.lightGrey }}
           >
-            Tax Rates
+            Cancel
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("groups")}
-            className="py-2 text-sm"
-            style={{
-              backgroundColor: activeTab === "groups" ? AppColors.primary : AppColors.bgColor2,
-              color: activeTab === "groups" ? AppColors.white : AppColors.black,
-            }}
+            disabled={saving}
+            onClick={() => void save()}
+            className="h-11 flex-1 rounded-lg font-semibold text-white disabled:opacity-60"
+            style={{ backgroundColor: AppColors.primary }}
           >
-            Tax Groups
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
-
-        {activeTab === "rates" ? (
-          <div className="mt-3 space-y-2">
-            {rates.map((rate) => (
-              <div
-                key={rate.id}
-                className="flex items-center justify-between rounded-md px-3 py-2"
-                style={{ backgroundColor: AppColors.bgColor2 }}
-              >
-                <span className="text-sm text-black">{rate.name}</span>
-                <span className="text-sm" style={{ color: AppColors.grey }}>
-                  {rate.rate}
-                </span>
-              </div>
+      }
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <label className="space-y-1.5 text-sm font-semibold text-black">
+          <span>Tax name</span>
+          <select
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={inputClass}
+            style={{ borderColor: AppColors.lightGrey, backgroundColor: AppColors.bgColor2 }}
+          >
+            {TAX_NAMES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
-          </div>
-        ) : (
-          <div className="mt-3 rounded-md px-3 py-5 text-center text-sm" style={{ backgroundColor: AppColors.bgColor2, color: AppColors.grey }}>
-            No tax groups yet.
-          </div>
-        )}
+          </select>
+        </label>
+        <label className="space-y-1.5 text-sm font-semibold text-black">
+          <span>Rate (%)</span>
+          <input
+            value={rate}
+            inputMode="decimal"
+            onChange={(e) => setRate(e.target.value)}
+            placeholder="e.g. 17"
+            className={inputClass}
+            style={{ borderColor: AppColors.lightGrey, backgroundColor: AppColors.bgColor2 }}
+          />
+        </label>
       </div>
+      {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
+    </AppModal>
+  );
+}
+
+function TaxRatesContent({ tab }: { tab: (typeof TABS)[number] }) {
+  const rates = useSettingsStore((s) => s.app.taxes.rates);
+  const patchSection = useSettingsStore((s) => s.patchSection);
+  const { notify, query } = useSettingsScreen();
+  const { confirm } = useConfirm();
+  const [adding, setAdding] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const remove = async (rate: TaxRate) => {
+    const ok = await confirm({
+      title: "Delete tax rate",
+      message: `Delete ${rate.name} ${rate.rate}%?`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    setDeletingId(rate.id);
+    try {
+      await patchSection("taxes", { rates: rates.filter((r) => r.id !== rate.id) });
+      notify("Tax rate deleted");
+    } catch (err) {
+      notify(getApiErrorMessage(err, "Failed to delete tax rate"), "error");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (tab === "Tax Groups") {
+    return (
+      <SettingsSection title="Tax Groups" icon="category">
+        <p data-settings-row className="px-4 py-8 text-center text-sm" style={{ color: AppColors.grey }}>
+          No tax groups yet.
+        </p>
+      </SettingsSection>
+    );
+  }
+
+  const q = query.trim().toLowerCase();
+  const visible = q ? rates.filter((r) => `${r.name} ${r.rate}%`.toLowerCase().includes(q)) : rates;
+
+  return (
+    <>
+      <SettingsSection title="Tax Rates" icon="percent" description="Saved to your account">
+        {visible.map((rate) => (
+          <div key={rate.id} data-settings-row className="flex min-h-14 items-center gap-4 px-4 py-3">
+            <span className="flex-1 text-sm font-medium text-black">{rate.name}</span>
+            <span className="text-sm font-semibold tabular-nums" style={{ color: AppColors.primary }}>
+              {rate.rate}%
+            </span>
+            <button
+              type="button"
+              aria-label={`Delete ${rate.name} ${rate.rate}%`}
+              disabled={deletingId === rate.id}
+              onClick={() => void remove(rate)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
+            >
+              <span className="material-icons" style={{ fontSize: 20 }}>delete_outline</span>
+            </button>
+          </div>
+        ))}
+        {!rates.length && (
+          <p className="px-4 py-8 text-center text-sm" style={{ color: AppColors.grey }}>
+            No tax rates yet. Tap + to add one.
+          </p>
+        )}
+      </SettingsSection>
 
       <button
         type="button"
-        onClick={() => setShowModal(true)}
+        aria-label="Add tax rate"
+        onClick={() => setAdding(true)}
         className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-lg md:bottom-8"
         style={{ backgroundColor: AppColors.primary }}
       >
         <span className="material-icons text-white">add</span>
       </button>
 
-      {showModal && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-sm bg-white p-5">
-            <h3 className="mb-4 text-3xl font-semibold text-black">Add Tax Rate</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm font-semibold text-black">Tax Rate Name</label>
-              <label className="text-sm font-semibold text-black">Rate</label>
-              <select
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                className="col-span-1 h-10 rounded-md border px-3 text-sm outline-none"
-                style={{ borderColor: AppColors.lightGrey, backgroundColor: AppColors.bgColor2 }}
-              >
-                <option value="Other">Other</option>
-                <option value="GST">GST</option>
-                <option value="VAT">VAT</option>
-              </select>
-              <input
-                value={draftRate}
-                onChange={(e) => setDraftRate(e.target.value)}
-                placeholder="e.g. 3"
-                className="col-span-1 h-10 rounded-md border px-3 text-sm outline-none"
-                style={{ borderColor: AppColors.lightGrey, backgroundColor: AppColors.bgColor2 }}
-              />
-            </div>
-            <div className="mt-6 flex items-center justify-end gap-6">
-              <button type="button" onClick={() => setShowModal(false)} className="text-sm text-black">
-                Cancel
-              </button>
-              <button type="button" onClick={handleSave} className="text-sm text-black">
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {adding && <AddTaxRateModal onClose={() => setAdding(false)} />}
+    </>
   );
 }
 
+export function TaxListScreen() {
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Tax Rates");
+  return (
+    <SettingsLayout
+      title="Tax List"
+      toolbar={<SettingsSegmented label="Tax list" options={TABS} value={tab} onChange={setTab} />}
+    >
+      <TaxRatesContent tab={tab} />
+    </SettingsLayout>
+  );
+}

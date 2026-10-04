@@ -11,6 +11,11 @@ interface AppDropDownProps<T extends string> {
   onChange: (value: T) => void;
   hintText?: string;
   getLabel?: (item: T) => string;
+  /** Optional action pinned below the options, e.g. "Add New Unit". */
+  actionLabel?: string;
+  onAction?: () => void;
+  /** Shown instead of options when `items` is empty (only used with an action). */
+  emptyText?: string;
 }
 
 export function AppDropDown<T extends string>({
@@ -20,7 +25,11 @@ export function AppDropDown<T extends string>({
   onChange,
   hintText = "Select",
   getLabel = (item) => item,
+  actionLabel,
+  onAction,
+  emptyText,
 }: AppDropDownProps<T>) {
+  const hasAction = Boolean(actionLabel && onAction);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -61,6 +70,11 @@ export function AppDropDown<T extends string>({
           className="mt-1 w-full bg-white border rounded-md shadow-lg z-50 max-h-48 overflow-y-auto"
           style={{ borderColor: AppColors.lightGrey }}
         >
+          {hasAction && items.length === 0 && emptyText && (
+            <li className="px-4 py-2.5 text-sm" style={{ color: AppColors.grey }}>
+              {emptyText}
+            </li>
+          )}
           {items.map((item) => (
             <li key={item}>
               <button
@@ -82,6 +96,25 @@ export function AppDropDown<T extends string>({
               </button>
             </li>
           ))}
+          {hasAction && (
+            <li
+              className="sticky bottom-0 border-t bg-white"
+              style={{ borderColor: AppColors.lightGrey }}
+            >
+              <button
+                type="button"
+                className="w-full px-4 py-2.5 flex items-center gap-2 text-sm font-semibold text-left transition-colors hover:bg-gray-50"
+                style={{ color: AppColors.primary }}
+                onClick={() => {
+                  setOpen(false);
+                  onAction?.();
+                }}
+              >
+                <span className="material-icons text-lg">add_circle_outline</span>
+                {actionLabel}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

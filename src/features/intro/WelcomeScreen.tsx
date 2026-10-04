@@ -76,10 +76,6 @@ export function WelcomeScreen() {
       <div className="px-4">
         <AppButton text="Sign In" backgroundColor={AppColors.bordercolor} textColor={AppColors.greyishBlack} onClick={() => router.push(RouteName.login)} />
       </div>
-      <div className="h-4" />
-      <div className="px-4">
-        <AppButton text="Guest Account" backgroundColor={AppColors.bordercolor} textColor={AppColors.greyishBlack} onClick={() => router.replace(RouteName.dashboard)} />
-      </div>
       <div className="h-6" />
       <PoweredBy />
       <AppAsset src={AppImages.introFooter} width={800} height={60} className="w-full h-auto object-contain mt-4" />

@@ -29,6 +29,8 @@ interface AppTextFieldProps {
   type?: string;
   name?: string;
   error?: string;
+  /** Shows a red asterisk after the title. */
+  required?: boolean;
 }
 
 export function AppTextField({
@@ -51,6 +53,7 @@ export function AppTextField({
   type,
   name,
   error,
+  required,
 }: AppTextFieldProps) {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
@@ -83,6 +86,11 @@ export function AppTextField({
           style={{ fontFamily: "var(--font-poppins)" }}
         >
           {title}
+          {required && (
+            <span className="ml-0.5 text-red-500" aria-hidden>
+              *
+            </span>
+          )}
         </label>
       )}
 
@@ -102,6 +110,8 @@ export function AppTextField({
           onChange={(e) => handleChange(e.target.value)}
           placeholder={hintText ?? (isDateField ? "dd/mm/yyyy" : undefined)}
           maxLength={maxLength}
+          aria-invalid={error ? true : undefined}
+          aria-required={required || undefined}
           type={
             isPasswordField
               ? passwordVisible

@@ -1,5 +1,5 @@
 import { apiClient } from "@/services/api-client";
-import { appendIfPresent, unwrap, type ApiEnvelope } from "@/services/api-helpers";
+import { unwrap, type ApiEnvelope } from "@/services/api-helpers";
 
 export type ExpenseCategoryRecord = {
   id: number;
@@ -16,6 +16,9 @@ export type ExpenseRecord = {
   category?: string | null;
   total_amount?: number | string | null;
   notes?: string | null;
+  /** Cash, Bank, Cheque or Online; missing on older expenses, which count as Cash. */
+  payment_mode?: string | null;
+  bank_account?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -26,7 +29,11 @@ export type CreateExpensePayload = {
   category?: string | null;
   totalAmount?: string | number;
   notes?: string;
+  paymentMode?: string;
+  bankAccount?: string;
 };
+
+export const EXPENSE_PAYMENT_MODES = ["Cash", "Bank", "Cheque", "Online"];
 
 /* ---- categories ---- */
 
@@ -52,6 +59,11 @@ export async function deleteExpenseCategory(categoryId: number) {
 
 /* ---- expenses ---- */
 
+export async function getNextExpenseNo() {
+  const response = await apiClient.get<ApiEnvelope<{ expense_no: string }>>("/expenses/next-number");
+  return unwrap(response)?.expense_no ?? "";
+}
+
 export async function getExpenses() {
   const response = await apiClient.get<ApiEnvelope<ExpenseRecord[]>>("/expenses/");
   return unwrap(response) ?? [];
@@ -65,6 +77,8 @@ export async function createExpense(payload: CreateExpensePayload) {
   if (payload.totalAmount !== undefined && payload.totalAmount !== "")
     body.total_amount = Number(payload.totalAmount);
   if (payload.notes) body.notes = payload.notes;
+  if (payload.paymentMode) body.payment_mode = payload.paymentMode;
+  if (payload.bankAccount !== undefined) body.bank_account = payload.bankAccount;
 
   const response = await apiClient.post<ApiEnvelope<ExpenseRecord>>("/expenses/", body);
   return unwrap(response);
@@ -78,6 +92,8 @@ export async function updateExpense(expenseId: number, payload: CreateExpensePay
   if (payload.totalAmount !== undefined && payload.totalAmount !== "")
     body.total_amount = Number(payload.totalAmount);
   if (payload.notes !== undefined) body.notes = payload.notes;
+  if (payload.paymentMode) body.payment_mode = payload.paymentMode;
+  if (payload.bankAccount !== undefined) body.bank_account = payload.bankAccount;
 
   const response = await apiClient.patch<ApiEnvelope<ExpenseRecord>>(
     `/expenses/${expenseId}`,
